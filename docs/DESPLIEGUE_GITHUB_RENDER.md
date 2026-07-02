@@ -31,7 +31,7 @@ Configurar estas variables de entorno:
 | Variable | Valor |
 | --- | --- |
 | ENTRA_TENANT | `bakertilly.co` |
-| ENTRA_CLIENT_ID | Application (client) ID entregado por TI |
+| ENTRA_CLIENT_ID | GUID real del Application (client) ID entregado por TI |
 | ALLOWED_EMAIL_DOMAIN | `@bakertilly.co` |
 
 ## Solicitud a TI
@@ -62,3 +62,11 @@ La app solo requiere:
 ## Nota importante
 
 El Application (client) ID no es un secreto. Aun asi, usar la variable `ENTRA_CLIENT_ID` en Render facilita cambiar la app registrada sin tocar codigo.
+
+El valor debe verse como:
+
+```text
+xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+No usar textos como `Application (client) ID entregado por TI`; Render los enviaria como `client_id` y Microsoft Entra responderia con `AADSTS700016`.

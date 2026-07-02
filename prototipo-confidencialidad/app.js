@@ -254,16 +254,33 @@ function getRedirectUri() {
   return `${window.location.origin}${window.location.pathname}`;
 }
 
+function hasValidClientIdFormat() {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(office365Auth.clientId);
+}
+
+function getClientIdConfigMessage() {
+  if (office365Auth.clientId === "REEMPLAZAR_CLIENT_ID_ENTRA") {
+    return "Configura el Application (client) ID real de Entra ID antes de iniciar sesión.";
+  }
+
+  if (!hasValidClientIdFormat()) {
+    return "El Application (client) ID debe ser un GUID real, no texto descriptivo.";
+  }
+
+  return "";
+}
+
 function isOffice365Configured() {
-  return office365Auth.clientId !== "REEMPLAZAR_CLIENT_ID_ENTRA";
+  return getClientIdConfigMessage() === "";
 }
 
 function getMsalClient(options = {}) {
   const quiet = options.quiet === true;
+  const configMessage = getClientIdConfigMessage();
 
-  if (!isOffice365Configured()) {
+  if (configMessage) {
     if (!quiet) {
-      showToast("Configura el clientId de Entra ID en app.js para activar el ingreso real.");
+      showToast(configMessage);
     }
     return null;
   }
