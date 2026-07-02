@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Confidencialidad | Clientes asignados</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="auth-screen" id="authScreen">
+      <section class="auth-panel" aria-labelledby="authTitle">
+        <div class="brand-row">
+          <div class="brand-mark" aria-hidden="true">BT</div>
+          <div>
+            <p class="eyebrow">Baker Tilly Colombia</p>
+            <h1 id="authTitle">Confidencialidad</h1>
+          </div>
+        </div>
+        <div class="auth-copy">
+          <p>Encuestas para solicitudes de acceso por cliente.</p>
+        </div>
+        <button class="primary wide" id="loginButton" type="button">
+          <span aria-hidden="true" class="button-icon">□</span>
+          Entrar con Office 365
+        </button>
+      </section>
+    </main>
+
+    <main class="app-shell is-hidden" id="appShell">
+      <header class="topbar">
+        <div class="topbar-title">
+          <div class="brand-mark compact" aria-hidden="true">BT</div>
+          <div>
+            <p class="eyebrow">Confidencialidad</p>
+            <h1>Clientes asignados</h1>
+          </div>
+        </div>
+        <div class="session">
+          <div>
+            <span class="session-name" id="sessionName"></span>
+            <span class="session-mail" id="sessionMail"></span>
+          </div>
+          <button class="icon-button" id="logoutButton" type="button" title="Cerrar sesión" aria-label="Cerrar sesión">
+            ×
+          </button>
+        </div>
+      </header>
+
+      <section class="summary-strip" aria-label="Resumen">
+        <article>
+          <span class="metric" id="metricClientes">0</span>
+          <span>Clientes activos</span>
+        </article>
+        <article>
+          <span class="metric" id="metricPendientes">0</span>
+          <span>Encuestas pendientes</span>
+        </article>
+        <article>
+          <span class="metric" id="metricEnviadas">0</span>
+          <span>Enviadas hoy</span>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <aside class="client-panel" aria-labelledby="clientsTitle">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Asignaciones</p>
+              <h2 id="clientsTitle">Mis clientes</h2>
+            </div>
+            <span class="status-dot" aria-label="Conectado"></span>
+          </div>
+          <label class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="searchInput" type="search" placeholder="Buscar cliente o NIT">
+          </label>
+          <div class="client-list" id="clientList"></div>
+        </aside>
+
+        <section class="survey-panel" aria-live="polite">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-symbol" aria-hidden="true">C</div>
+            <h2>Selecciona un cliente</h2>
+            <p>El formulario quedará asociado al cliente y al usuario autenticado.</p>
+          </div>
+
+          <form class="survey-form is-hidden" id="surveyForm">
+            <div class="form-heading">
+              <div>
+                <p class="eyebrow">Encuesta</p>
+                <h2 id="selectedClientName"></h2>
+                <p class="muted" id="selectedClientMeta"></p>
+              </div>
+              <span class="risk-pill" id="riskPill">Pendiente</span>
+            </div>
+
+            <fieldset>
+              <legend>Acceso solicitado</legend>
+              <div class="form-grid">
+                <label>
+                  Tipo de acceso
+                  <select name="tipoAcceso" required>
+                    <option value="">Seleccionar</option>
+                    <option>Huddle</option>
+                    <option>Focus</option>
+                  </select>
+                </label>
+                <label>
+                  Vigencia máxima
+                  <input name="vigencia" type="date" required>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Clasificación de información</legend>
+              <div class="segmented">
+                <label><input type="radio" name="clasificacion" value="Interna" required> Interna</label>
+                <label><input type="radio" name="clasificacion" value="Confidencial"> Confidencial</label>
+                <label><input type="radio" name="clasificacion" value="Restringida"> Restringida</label>
+              </div>
+              <div class="checks">
+                <label><input type="checkbox" name="datosPersonales"> Datos personales</label>
+                <label><input type="checkbox" name="datosFinancieros"> Información financiera</label>
+                <label><input type="checkbox" name="datosLegales"> Información legal o sensible</label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Justificación</legend>
+              <label>
+                Motivo de la solicitud
+                <textarea name="justificacion" rows="5" required placeholder="Describe el alcance del acceso y la actividad que lo requiere"></textarea>
+              </label>
+            </fieldset>
+
+            <label class="consent">
+              <input type="checkbox" name="aceptacion" required>
+              Confirmo que usaré la información únicamente para actividades autorizadas por la compañía.
+            </label>
+
+            <div class="form-actions">
+              <button class="secondary" type="button" id="clearButton">Limpiar</button>
+              <button class="primary" type="submit">
+                <span aria-hidden="true" class="button-icon">›</span>
+                Enviar a accesos
+              </button>
+            </div>
+          </form>
+
+          <section class="mail-preview is-hidden" id="mailPreview" aria-labelledby="mailTitle">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Correo preparado</p>
+                <h2 id="mailTitle">Solicitud enviada</h2>
+              </div>
+              <button class="icon-button" id="closePreview" type="button" title="Cerrar" aria-label="Cerrar">×</button>
+            </div>
+            <dl>
+              <div>
+                <dt>Para</dt>
+                <dd id="mailTo"></dd>
+              </div>
+              <div>
+                <dt>Asunto</dt>
+                <dd id="mailSubject"></dd>
+              </div>
+              <div>
+                <dt>Resumen</dt>
+                <dd id="mailBody"></dd>
+              </div>
+            </dl>
+          </section>
+        </section>
+      </section>
+
+      <section class="history-band" aria-labelledby="historyTitle">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Trazabilidad</p>
+            <h2 id="historyTitle">Últimos envíos</h2>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Solicitante</th>
+                <th>Clasificación</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="historyRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="env.js"></script>
+    <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

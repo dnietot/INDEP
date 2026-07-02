@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: confidencialidad-clientes
+    runtime: static
+    buildCommand: node build-render-config.js
+    staticPublishPath: prototipo-confidencialidad
+    envVars:
+      - key: ENTRA_TENANT
+        value: bakertilly.co
+      - key: ENTRA_CLIENT_ID
+        sync: false
+      - key: ALLOWED_EMAIL_DOMAIN
+        value: "@bakertilly.co"

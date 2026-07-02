@@ -1,0 +1,29 @@
+Lista,Columna,Tipo,Requerido,Notas
+Clientes,ClienteId,Texto corto,Si,Identificador interno
+Clientes,NombreCliente,Texto corto,Si,Nombre visible en la app
+Clientes,NIT,Texto corto,No,Identificacion tributaria
+Clientes,LineaServicio,Opcion,Si,"Auditoria; Impuestos; Consultoria; BPO; Legal; Otro"
+Clientes,SocioResponsable,Persona o grupo,No,Socio del cliente
+Clientes,GerenteResponsable,Persona o grupo,No,Gerente del cliente
+Clientes,Estado,Opcion,Si,"Activo; Pausado; Cerrado"
+AsignacionesClientes,ClienteId,Busqueda,Si,Referencia a Clientes
+AsignacionesClientes,UsuarioUPN,Texto corto,Si,Correo corporativo del colaborador
+AsignacionesClientes,Rol,Opcion,No,"Socio; Gerente; Senior; Staff; Accesos"
+AsignacionesClientes,Activo,Si/No,Si,Asignacion vigente
+EncuestasConfidencialidad,EncuestaId,Texto corto,Si,Consecutivo o GUID
+EncuestasConfidencialidad,ClienteId,Busqueda,Si,Referencia a Clientes
+EncuestasConfidencialidad,UsuarioUPN,Texto corto,Si,Correo corporativo del solicitante
+EncuestasConfidencialidad,FechaEnvio,Fecha y hora,Si,Fecha de registro
+EncuestasConfidencialidad,TipoAcceso,Opcion,Si,"Huddle; Focus"
+EncuestasConfidencialidad,ClasificacionInformacion,Opcion,Si,"Interna; Confidencial; Restringida"
+EncuestasConfidencialidad,DatosPersonales,Si/No,No,Contiene datos personales
+EncuestasConfidencialidad,DatosFinancieros,Si/No,No,Contiene informacion financiera
+EncuestasConfidencialidad,DatosLegales,Si/No,No,Contiene informacion legal o sensible
+EncuestasConfidencialidad,VigenciaAcceso,Fecha,Si,Fecha maxima solicitada
+EncuestasConfidencialidad,Justificacion,Varias lineas,Si,Motivo del acceso
+EncuestasConfidencialidad,AceptacionConfidencialidad,Si/No,Si,Confirmacion del usuario
+EncuestasConfidencialidad,EstadoCorreo,Opcion,Si,"Pendiente; Enviado; Error"
+EncargadosAccesos,Area,Opcion,Si,"Accesos; Seguridad; TI; Auditoria"
+EncargadosAccesos,Correo,Texto corto,Si,Destinatario
+EncargadosAccesos,Activo,Si/No,Si,Incluir en envios
+EncargadosAccesos,LineaServicio,Opcion,No,Ruteo por linea si aplica
