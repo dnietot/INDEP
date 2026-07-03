@@ -1,7 +1,7 @@
 let currentUser = {
   name: "Diego Nieto",
   email: "diego.nieto@bakertilly.co",
-  role: "Senior"
+  role: "user"
 };
 
 const office365Auth = {
@@ -19,13 +19,23 @@ const temporaryLogin = {
   email: (window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEmail || "diego.nieto@bakertilly.co").toLowerCase(),
   passwordHash: window.CONFIDENCIALIDAD_CONFIG?.temporaryPasswordHash || "8ff2593d80ac7ff8a06a33e35c9ee1ee9d72fb8fd9e9d7c9b57b36d139563543"
 };
+const temporaryAdmin = {
+  enabled: window.CONFIDENCIALIDAD_CONFIG?.temporaryAdminEnabled !== false,
+  login: (window.CONFIDENCIALIDAD_CONFIG?.temporaryAdminLogin || "admin").toLowerCase(),
+  name: window.CONFIDENCIALIDAD_CONFIG?.temporaryAdminName || "Admin",
+  email: (window.CONFIDENCIALIDAD_CONFIG?.temporaryAdminEmail || "admin@bakertilly.co").toLowerCase(),
+  passwordHash: window.CONFIDENCIALIDAD_CONFIG?.temporaryAdminPasswordHash || "8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec"
+};
+const clientsStorageKey = "confidencialidadClients";
+const accessRecordsStorageKey = "confidencialidadAccessRecords";
+const webhookStorageKey = "confidencialidadEmailWebhookUrl";
 
 const accessTeam = [
   "accesos@bakertilly.co",
   "seguridad.informacion@bakertilly.co"
 ];
 
-const clients = [
+const defaultClients = [
   {
     id: "CLI-001",
     name: "Andes Retail S.A.S.",
@@ -64,8 +74,10 @@ const clients = [
   }
 ];
 
+let clients = loadClients();
 let selectedClient = null;
-let history = [];
+let accessRecords = loadAccessRecords();
+let history = buildHistoryFromAccessRecords();
 let msalClient = null;
 
 const authScreen = document.querySelector("#authScreen");
@@ -95,8 +107,95 @@ const toast = document.querySelector("#toast");
 const metricClientes = document.querySelector("#metricClientes");
 const metricPendientes = document.querySelector("#metricPendientes");
 const metricEnviadas = document.querySelector("#metricEnviadas");
+const adminPanel = document.querySelector("#adminPanel");
+const emailConfigForm = document.querySelector("#emailConfigForm");
+const webhookUrlInput = document.querySelector("#webhookUrlInput");
+const clearWebhookButton = document.querySelector("#clearWebhookButton");
+const clientAdminForm = document.querySelector("#clientAdminForm");
+const adminClientsRows = document.querySelector("#adminClientsRows");
+const adminAccessRows = document.querySelector("#adminAccessRows");
+
+function cloneDefaultClients() {
+  return defaultClients.map((client) => ({
+    ...client,
+    assignedTo: [...client.assignedTo]
+  }));
+}
+
+function loadClients() {
+  try {
+    const saved = localStorage.getItem(clientsStorageKey);
+    return saved ? JSON.parse(saved) : cloneDefaultClients();
+  } catch (error) {
+    return cloneDefaultClients();
+  }
+}
+
+function saveClients() {
+  localStorage.setItem(clientsStorageKey, JSON.stringify(clients));
+}
+
+function loadAccessRecords() {
+  try {
+    const saved = localStorage.getItem(accessRecordsStorageKey);
+    return saved ? JSON.parse(saved) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveAccessRecords() {
+  localStorage.setItem(accessRecordsStorageKey, JSON.stringify(accessRecords));
+}
+
+function buildHistoryFromAccessRecords() {
+  return accessRecords.map((record) => ({
+    date: new Date(record.submittedAt).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
+    clientName: record.clientName,
+    user: record.requesterEmail,
+    accesses: record.accesses
+  }));
+}
+
+function getTemporaryUsers() {
+  const users = [];
+
+  if (temporaryLogin.enabled) {
+    users.push({
+      login: temporaryLogin.email,
+      name: temporaryLogin.name,
+      email: temporaryLogin.email,
+      role: "user",
+      passwordHash: temporaryLogin.passwordHash
+    });
+  }
+
+  if (temporaryAdmin.enabled) {
+    users.push({
+      login: temporaryAdmin.login,
+      name: temporaryAdmin.name,
+      email: temporaryAdmin.email,
+      role: "admin",
+      passwordHash: temporaryAdmin.passwordHash
+    });
+  }
+
+  return users;
+}
+
+function isAdmin() {
+  return currentUser.role === "admin";
+}
+
+function getEffectiveEmailWebhookUrl() {
+  return localStorage.getItem(webhookStorageKey) || emailWebhookUrl;
+}
 
 function assignedClients() {
+  if (isAdmin()) {
+    return clients;
+  }
+
   return clients.filter((client) => client.assignedTo.includes(currentUser.email));
 }
 
@@ -104,7 +203,7 @@ function renderMetrics() {
   const mine = assignedClients();
   metricClientes.textContent = mine.length;
   metricPendientes.textContent = mine.filter((client) => client.confidentialityStatus === "Pendiente").length;
-  metricEnviadas.textContent = history.length;
+  metricEnviadas.textContent = isAdmin() ? accessRecords.length : history.length;
 }
 
 function renderClients() {
@@ -191,6 +290,8 @@ function showToast(message) {
 
 function renderHistory() {
   historyRows.innerHTML = "";
+  history = buildHistoryFromAccessRecords()
+    .filter((item) => isAdmin() || item.user === currentUser.email);
 
   if (history.length === 0) {
     historyRows.innerHTML = `
@@ -211,6 +312,48 @@ function renderHistory() {
       <td><span class="badge done">Correo preparado</span></td>
     `;
     historyRows.append(row);
+  });
+}
+
+function renderAdminPanel() {
+  adminPanel.classList.toggle("is-hidden", !isAdmin());
+  if (!isAdmin()) return;
+
+  webhookUrlInput.value = getEffectiveEmailWebhookUrl();
+  adminClientsRows.innerHTML = "";
+  adminAccessRows.innerHTML = "";
+
+  clients.forEach((client) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${client.name}</td>
+      <td>${client.nit}</td>
+      <td>${client.serviceLine}</td>
+      <td>${client.assignedTo.join(", ")}</td>
+      <td><button class="secondary small-button" type="button" data-remove-client="${client.id}">Quitar</button></td>
+    `;
+    adminClientsRows.append(row);
+  });
+
+  if (accessRecords.length === 0) {
+    adminAccessRows.innerHTML = `
+      <tr>
+        <td colspan="5" class="muted">Aun no hay accesos solicitados.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  accessRecords.forEach((record) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${record.clientName}</td>
+      <td>${record.requesterEmail}</td>
+      <td>${record.accesses}</td>
+      <td>${record.expiresAt}</td>
+      <td>${record.workToDevelop}</td>
+    `;
+    adminAccessRows.append(row);
   });
 }
 
@@ -256,11 +399,13 @@ function buildEmailPreview(payload) {
 }
 
 async function sendEmailWebhook(payload) {
-  if (!emailWebhookUrl) {
+  const webhookUrl = getEffectiveEmailWebhookUrl();
+
+  if (!webhookUrl) {
     return false;
   }
 
-  await fetch(emailWebhookUrl, {
+  await fetch(webhookUrl, {
     method: "POST",
     mode: "no-cors",
     headers: {
@@ -286,6 +431,9 @@ async function submitSurvey(event) {
 
   const payload = buildAccessRequestPayload(formData);
   const now = new Date();
+  accessRecords.unshift(payload);
+  saveAccessRecords();
+
   history.unshift({
     date: now.toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
     clientName: selectedClient.name,
@@ -298,6 +446,7 @@ async function submitSurvey(event) {
   renderHistory();
   renderClients();
   renderMetrics();
+  renderAdminPanel();
   updateSubmitState();
 
   try {
@@ -323,41 +472,50 @@ async function sha256Hex(value) {
     .join("");
 }
 
-function rememberTemporarySession() {
+function rememberTemporarySession(user) {
   sessionStorage.setItem("temporaryPasswordSession", "true");
+  sessionStorage.setItem("temporaryPasswordLogin", user.login);
 }
 
 function forgetTemporarySession() {
   sessionStorage.removeItem("temporaryPasswordSession");
+  sessionStorage.removeItem("temporaryPasswordLogin");
 }
 
-function applyTemporaryUser() {
+function applyTemporaryUser(user = getTemporaryUsers()[0]) {
+  if (!user) return;
+
   currentUser = {
-    name: temporaryLogin.name,
-    email: temporaryLogin.email,
-    role: currentUser.role
+    name: user.name,
+    email: user.email,
+    role: user.role
   };
 }
 
 async function loginWithPassword(event) {
   event.preventDefault();
 
-  if (!temporaryLogin.enabled) {
-    showToast("El ingreso temporal con contrasena no esta habilitado.");
+  const login = passwordEmail.value.trim().toLowerCase();
+  const user = getTemporaryUsers().find((candidate) => {
+    return candidate.login === login || candidate.email === login;
+  });
+
+  if (!user) {
+    passwordInput.value = "";
+    showToast("Usuario o contrasena incorrectos.");
     return;
   }
 
-  const email = passwordEmail.value.trim().toLowerCase();
   const passwordHash = await sha256Hex(passwordInput.value);
 
-  if (email !== temporaryLogin.email || passwordHash !== temporaryLogin.passwordHash) {
+  if (passwordHash !== user.passwordHash) {
     passwordInput.value = "";
-    showToast("Correo o contrasena incorrectos.");
+    showToast("Usuario o contrasena incorrectos.");
     return;
   }
 
-  applyTemporaryUser();
-  rememberTemporarySession();
+  applyTemporaryUser(user);
+  rememberTemporarySession(user);
   passwordInput.value = "";
   startSession();
 }
@@ -431,11 +589,12 @@ async function redirectToOffice365() {
 
 function startSession() {
   sessionName.textContent = currentUser.name;
-  sessionMail.textContent = currentUser.email;
+  sessionMail.textContent = isAdmin() ? `${currentUser.email} - admin` : currentUser.email;
   authScreen.classList.add("is-hidden");
   appShell.classList.remove("is-hidden");
   renderClients();
   renderHistory();
+  renderAdminPanel();
   renderMetrics();
 }
 
@@ -454,7 +613,7 @@ function applyAuthenticatedUser(profile, account) {
   currentUser = {
     name: profile.displayName || account.name || email,
     email,
-    role: currentUser.role
+    role: "user"
   };
 
   return true;
@@ -510,7 +669,9 @@ async function finishOffice365Redirect() {
   }
 
   if (sessionStorage.getItem("temporaryPasswordSession") === "true") {
-    applyTemporaryUser();
+    const savedLogin = sessionStorage.getItem("temporaryPasswordLogin");
+    const savedUser = getTemporaryUsers().find((user) => user.login === savedLogin || user.email === savedLogin);
+    applyTemporaryUser(savedUser);
     startSession();
     return;
   }
@@ -549,12 +710,89 @@ async function logout() {
 
   authScreen.classList.remove("is-hidden");
   appShell.classList.add("is-hidden");
+  adminPanel.classList.add("is-hidden");
+}
+
+function handleEmailConfigSubmit(event) {
+  event.preventDefault();
+  const url = webhookUrlInput.value.trim();
+
+  if (url) {
+    localStorage.setItem(webhookStorageKey, url);
+    showToast("URL del flujo guardada en este navegador.");
+  } else {
+    localStorage.removeItem(webhookStorageKey);
+    showToast("URL del flujo eliminada.");
+  }
+
+  renderAdminPanel();
+}
+
+function clearWebhookConfig() {
+  webhookUrlInput.value = "";
+  localStorage.removeItem(webhookStorageKey);
+  showToast("URL del flujo eliminada.");
+  renderAdminPanel();
+}
+
+function handleClientAdminSubmit(event) {
+  event.preventDefault();
+  const formData = new FormData(clientAdminForm);
+  const assignedTo = String(formData.get("assignedTo") || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  const client = {
+    id: `CLI-${Date.now()}`,
+    name: String(formData.get("name") || "").trim(),
+    nit: String(formData.get("nit") || "").trim(),
+    serviceLine: String(formData.get("serviceLine") || "").trim(),
+    manager: String(formData.get("manager") || "").trim(),
+    assignedTo,
+    confidentialityStatus: "Pendiente"
+  };
+
+  if (!client.name || !client.nit || !client.serviceLine || !client.manager || assignedTo.length === 0) {
+    showToast("Completa todos los campos del cliente.");
+    return;
+  }
+
+  clients.push(client);
+  saveClients();
+  clientAdminForm.reset();
+  renderClients();
+  renderAdminPanel();
+  renderMetrics();
+  showToast("Cliente agregado.");
+}
+
+function removeClient(clientId) {
+  clients = clients.filter((client) => client.id !== clientId);
+  accessRecords = accessRecords.filter((record) => record.clientId !== clientId);
+  saveClients();
+  saveAccessRecords();
+
+  if (selectedClient?.id === clientId) {
+    selectedClient = null;
+    surveyForm.classList.add("is-hidden");
+    emptyState.classList.remove("is-hidden");
+  }
+
+  renderClients();
+  renderHistory();
+  renderAdminPanel();
+  renderMetrics();
+  showToast("Cliente eliminado.");
 }
 
 passwordEmail.value = temporaryLogin.email;
 passwordLoginForm.addEventListener("submit", loginWithPassword);
 loginButton.addEventListener("click", redirectToOffice365);
 logoutButton.addEventListener("click", logout);
+emailConfigForm.addEventListener("submit", handleEmailConfigSubmit);
+clearWebhookButton.addEventListener("click", clearWebhookConfig);
+clientAdminForm.addEventListener("submit", handleClientAdminSubmit);
 searchInput.addEventListener("input", renderClients);
 surveyForm.addEventListener("change", updateSubmitState);
 surveyForm.addEventListener("input", updateSubmitState);
@@ -571,6 +809,12 @@ clientList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-client-id]");
   if (!button) return;
   selectClient(button.dataset.clientId);
+});
+
+adminClientsRows.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-client]");
+  if (!button) return;
+  removeClient(button.dataset.removeClient);
 });
 
 finishOffice365Redirect();

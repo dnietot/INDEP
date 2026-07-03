@@ -21,8 +21,8 @@
         </div>
         <form class="password-form" id="passwordLoginForm">
           <label>
-            Correo
-            <input id="passwordEmail" type="email" autocomplete="username" required>
+            Usuario o correo
+            <input id="passwordEmail" type="text" autocomplete="username" required>
           </label>
           <label>
             Contrasena
@@ -171,6 +171,111 @@
             </dl>
           </section>
         </section>
+      </section>
+
+      <section class="admin-panel is-hidden" id="adminPanel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Administracion</p>
+            <h2>Panel admin</h2>
+          </div>
+        </div>
+
+        <div class="admin-grid">
+          <form class="admin-form" id="emailConfigForm">
+            <div>
+              <p class="eyebrow">Correo automatico</p>
+              <h3>Flujo de Power Automate</h3>
+            </div>
+            <label>
+              URL del flujo
+              <input id="webhookUrlInput" type="url" placeholder="https://prod-...logic.azure.com/...">
+            </label>
+            <div class="form-actions">
+              <button class="secondary" type="button" id="clearWebhookButton">Quitar</button>
+              <button class="primary" type="submit">Guardar URL</button>
+            </div>
+            <p class="muted">Esta configuracion queda guardada en este navegador para la demo.</p>
+          </form>
+
+          <form class="admin-form" id="clientAdminForm">
+            <div>
+              <p class="eyebrow">Clientes</p>
+              <h3>Agregar cliente</h3>
+            </div>
+            <div class="form-grid">
+              <label>
+                Nombre cliente
+                <input name="name" type="text" required>
+              </label>
+              <label>
+                NIT
+                <input name="nit" type="text" required>
+              </label>
+              <label>
+                Linea
+                <input name="serviceLine" type="text" required>
+              </label>
+              <label>
+                Responsable
+                <input name="manager" type="text" required>
+              </label>
+            </div>
+            <label>
+              Correos asignados
+              <input name="assignedTo" type="text" placeholder="correo1@bakertilly.co, correo2@bakertilly.co" required>
+            </label>
+            <div class="form-actions">
+              <button class="primary" type="submit">Agregar cliente</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="admin-section">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Base de clientes</p>
+              <h3>Clientes registrados</h3>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>NIT</th>
+                  <th>Linea</th>
+                  <th>Asignados</th>
+                  <th>Accion</th>
+                </tr>
+              </thead>
+              <tbody id="adminClientsRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="admin-section">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Accesos</p>
+              <h3>Quien tiene acceso y a que plataformas</h3>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Usuario</th>
+                  <th>Plataformas</th>
+                  <th>Vigencia</th>
+                  <th>Trabajo</th>
+                </tr>
+              </thead>
+              <tbody id="adminAccessRows"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <section class="history-band" aria-labelledby="historyTitle">

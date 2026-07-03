@@ -13,3 +13,13 @@ services:
         value: "@bakertilly.co"
       - key: EMAIL_WEBHOOK_URL
         sync: false
+      - key: TEMP_ADMIN_ENABLED
+        value: "true"
+      - key: TEMP_ADMIN_LOGIN
+        value: admin
+      - key: TEMP_ADMIN_NAME
+        value: Admin
+      - key: TEMP_ADMIN_EMAIL
+        value: admin@bakertilly.co
+      - key: TEMP_ADMIN_PASSWORD_HASH
+        sync: false

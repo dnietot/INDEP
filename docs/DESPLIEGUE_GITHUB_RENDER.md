@@ -37,6 +37,11 @@ Configurar estas variables de entorno:
 | TEMP_LOGIN_NAME | Nombre de la persona autorizada |
 | TEMP_LOGIN_EMAIL | Correo de la persona autorizada |
 | TEMP_LOGIN_PASSWORD_HASH | Hash SHA-256 de la contrasena temporal |
+| TEMP_ADMIN_ENABLED | `true` |
+| TEMP_ADMIN_LOGIN | `admin` |
+| TEMP_ADMIN_NAME | `Admin` |
+| TEMP_ADMIN_EMAIL | `admin@bakertilly.co` |
+| TEMP_ADMIN_PASSWORD_HASH | Hash SHA-256 de la contrasena temporal del admin |
 | EMAIL_WEBHOOK_URL | URL del flujo de Power Automate que enviara el correo |
 
 ## Solicitud a TI
@@ -93,6 +98,19 @@ La contrasena inicial correspondiente a ese hash es `Indep2026*`.
 
 Este control vive en el navegador porque el sitio es estatico. Sirve para una demo visual, pero no debe usarse para datos reales o confidenciales.
 
+## Perfil admin temporal
+
+El prototipo incluye un perfil temporal:
+
+```text
+Usuario: admin
+Contrasena: Admin2026*
+```
+
+El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o Focus, agregar/quitar clientes y guardar desde la pagina la URL del flujo de Power Automate.
+
+Importante: como Render esta publicando un sitio estatico, esa administracion queda en `localStorage` del navegador. Es util para validar pantallas y flujo, pero no sincroniza datos entre usuarios. Para que el admin gestione informacion real compartida se necesita conectar la app a SharePoint Lists, Dataverse, una API/backend o una base de datos.
+
 ## Envio automatico de correo
 
 Para la prueba rapida, usar Power Automate:
@@ -134,6 +152,6 @@ accesos@bakertilly.co; seguridad.informacion@bakertilly.co
 ```
 
 7. Guardar el flujo y copiar la URL HTTP generada.
-8. En Render, agregar la variable `EMAIL_WEBHOOK_URL` con esa URL y hacer redeploy.
+8. En Render, agregar la variable `EMAIL_WEBHOOK_URL` con esa URL y hacer redeploy. Para una prueba puntual tambien se puede entrar con el perfil `admin` y guardar la URL desde el panel web; esa opcion queda guardada solo en ese navegador.
 
 Nota: esta URL funciona como un secreto. Para demo esta bien, pero en produccion debe ocultarse detras de un backend o autenticacion real.

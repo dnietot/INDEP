@@ -7,6 +7,7 @@ Este prototipo muestra el flujo esperado:
 3. Boton Confidencialidad por cliente.
 4. Formulario de encuesta.
 5. Confirmacion del correo que se enviaria a encargados de accesos.
+6. Panel admin para ver clientes, solicitudes y configurar la URL del flujo de correo.
 
 Para abrirlo, usa el archivo:
 
@@ -14,7 +15,7 @@ Para abrirlo, usa el archivo:
 prototipo-confidencialidad/index.html
 ```
 
-El envio de correo sigue simulado. El login puede probarse contra Microsoft Entra ID cuando se configure el Application (client) ID.
+El login puede probarse contra Microsoft Entra ID cuando se configure el Application (client) ID. Mientras tanto existe un ingreso temporal por contrasena para validar la demo.
 
 ## Despliegue en Render
 
@@ -35,6 +36,11 @@ TEMP_LOGIN_ENABLED=true
 TEMP_LOGIN_NAME=Diego Nieto
 TEMP_LOGIN_EMAIL=diego.nieto@bakertilly.co
 TEMP_LOGIN_PASSWORD_HASH=8ff2593d80ac7ff8a06a33e35c9ee1ee9d72fb8fd9e9d7c9b57b36d139563543
+TEMP_ADMIN_ENABLED=true
+TEMP_ADMIN_LOGIN=admin
+TEMP_ADMIN_NAME=Admin
+TEMP_ADMIN_EMAIL=admin@bakertilly.co
+TEMP_ADMIN_PASSWORD_HASH=8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec
 EMAIL_WEBHOOK_URL=<URL del flujo de Power Automate>
 ```
 
@@ -42,9 +48,23 @@ EMAIL_WEBHOOK_URL=<URL del flujo de Power Automate>
 
 Cuando Render entregue la URL `https://...onrender.com/`, TI debe registrarla como redirect URI de tipo Single-page application en Microsoft Entra ID.
 
-El ingreso temporal por contrasena es solo para demo. La contrasena inicial es `Indep2026*`.
+El ingreso temporal por contrasena es solo para demo.
 
-Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura, la app enviara la solicitud al flujo de Power Automate.
+Credenciales iniciales:
+
+```text
+Usuario: diego.nieto@bakertilly.co
+Contrasena: Indep2026*
+
+Usuario admin: admin
+Contrasena admin: Admin2026*
+```
+
+El perfil `admin` puede ver todos los clientes, revisar las solicitudes registradas, agregar/quitar clientes y guardar desde la pagina la URL del flujo de Power Automate.
+
+Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate.
+
+Nota: el panel admin guarda clientes, solicitudes y URL del flujo en `localStorage`. Eso sirve para validar el comportamiento desde un navegador, pero no es una base compartida entre usuarios. Para produccion se necesita backend, SharePoint Lists, Dataverse o una base de datos.
 
 ## Prueba con Office 365 real
 
