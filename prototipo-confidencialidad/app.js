@@ -5,8 +5,8 @@ let currentUser = {
 };
 
 const office365Auth = {
-  tenant: window.CONFIDENCIALIDAD_CONFIG?.tenant || "bakertilly.co",
-  clientId: window.CONFIDENCIALIDAD_CONFIG?.clientId || "REEMPLAZAR_CLIENT_ID_ENTRA",
+  tenant: window.CONFIDENCIALIDAD_CONFIG?.tenant || "100c493f-7265-4dd6-9a05-63e1a210e604",
+  clientId: window.CONFIDENCIALIDAD_CONFIG?.clientId || "9d3e6808-f124-4324-875c-7e6da0b0a3bf",
   scopes: ["User.Read"]
 };
 

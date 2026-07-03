@@ -30,8 +30,8 @@ Configurar estas variables de entorno:
 
 | Variable | Valor |
 | --- | --- |
-| ENTRA_TENANT | `bakertilly.co` |
-| ENTRA_CLIENT_ID | GUID real del Application (client) ID entregado por TI |
+| ENTRA_TENANT | `100c493f-7265-4dd6-9a05-63e1a210e604` |
+| ENTRA_CLIENT_ID | `9d3e6808-f124-4324-875c-7e6da0b0a3bf` |
 | ALLOWED_EMAIL_DOMAIN | `@bakertilly.co` |
 | TEMP_LOGIN_ENABLED | `true` |
 | TEMP_LOGIN_NAME | Nombre de la persona autorizada |

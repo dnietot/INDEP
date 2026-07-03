@@ -172,7 +172,7 @@ Si se requiere una experiencia mas personalizada o integracion con sistemas inte
 
 Esta alternativa da mas control, pero necesita registro de aplicacion en Entra ID, permisos de Graph, consentimiento de administrador, administracion de secretos, despliegue y soporte tecnico.
 
-Para una app web a la medida, se debe registrar una aplicacion en Microsoft Entra ID y usar MSAL.js con authorization code + PKCE. En el prototipo local, el archivo `app.js` tiene el valor `REEMPLAZAR_CLIENT_ID_ENTRA`; debe sustituirse por el Application (client) ID real antes de probar el inicio de sesion corporativo.
+Para una app web a la medida, se debe registrar una aplicacion en Microsoft Entra ID y usar MSAL.js con authorization code + PKCE. En este prototipo ya quedo configurado el Application (client) ID `9d3e6808-f124-4324-875c-7e6da0b0a3bf`.
 
 Configuracion minima para la prueba real:
 
@@ -181,8 +181,8 @@ Configuracion minima para la prueba real:
 3. Agregar plataforma Single-page application.
 4. Registrar redirect URI `http://127.0.0.1:8766/` y, si se usara localhost, tambien `http://localhost:8766/`.
 5. Mantener permiso delegado Microsoft Graph `User.Read`.
-6. Copiar el Application (client) ID en `office365Auth.clientId`.
-7. Confirmar que `office365Auth.tenant` sea `bakertilly.co` o reemplazarlo por el Directory (tenant) ID.
+6. Confirmar que `office365Auth.clientId` sea `9d3e6808-f124-4324-875c-7e6da0b0a3bf`.
+7. Confirmar que `office365Auth.tenant` sea el Directory (tenant) ID `100c493f-7265-4dd6-9a05-63e1a210e604`.
 
 El prototipo valida el dominio autenticado `@bakertilly.co` y obtiene nombre/correo desde Microsoft Graph `/me`.
 

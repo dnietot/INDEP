@@ -1,6 +1,6 @@
 window.CONFIDENCIALIDAD_CONFIG = {
-  "tenant": "bakertilly.co",
-  "clientId": "REEMPLAZAR_CLIENT_ID_ENTRA",
+  "tenant": "100c493f-7265-4dd6-9a05-63e1a210e604",
+  "clientId": "9d3e6808-f124-4324-875c-7e6da0b0a3bf",
   "allowedEmailDomain": "@bakertilly.co",
   "temporaryLoginEnabled": true,
   "temporaryLoginName": "Diego Nieto",

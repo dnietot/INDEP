@@ -29,8 +29,8 @@ Publish Directory: prototipo-confidencialidad
 Variables:
 
 ```text
-ENTRA_TENANT=bakertilly.co
-ENTRA_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+ENTRA_TENANT=100c493f-7265-4dd6-9a05-63e1a210e604
+ENTRA_CLIENT_ID=9d3e6808-f124-4324-875c-7e6da0b0a3bf
 ALLOWED_EMAIL_DOMAIN=@bakertilly.co
 TEMP_LOGIN_ENABLED=true
 TEMP_LOGIN_NAME=Diego Nieto
@@ -44,7 +44,7 @@ TEMP_ADMIN_PASSWORD_HASH=8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af
 EMAIL_WEBHOOK_URL=<URL del flujo de Power Automate>
 ```
 
-`ENTRA_CLIENT_ID` debe ser el GUID real de Microsoft Entra ID. No pegues textos como `Application client ID`, `Application (client) ID entregado por TI` ni valores entre corchetes.
+`ENTRA_CLIENT_ID` debe ser el GUID real de Microsoft Entra ID. Para esta app quedo configurado como `9d3e6808-f124-4324-875c-7e6da0b0a3bf`.
 
 Cuando Render entregue la URL `https://...onrender.com/`, TI debe registrarla como redirect URI de tipo Single-page application en Microsoft Entra ID.
 
@@ -81,7 +81,7 @@ http://localhost:8766/
 
 6. En API permissions, deja Microsoft Graph `User.Read` como permiso delegado.
 7. Copia el Application (client) ID. Debe verse como `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.
-8. Reemplaza `REEMPLAZAR_CLIENT_ID_ENTRA` en `app.js`.
+8. Confirma que `ENTRA_CLIENT_ID` sea `9d3e6808-f124-4324-875c-7e6da0b0a3bf` y `ENTRA_TENANT` sea `100c493f-7265-4dd6-9a05-63e1a210e604`.
 9. Abre `http://127.0.0.1:8766/` o `http://localhost:8766/` y presiona Entrar con Office 365.
 
 La app lee el perfil autenticado desde Microsoft Graph `/me` y solo permite continuar si el correo termina en `@bakertilly.co`.

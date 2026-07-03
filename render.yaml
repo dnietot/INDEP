@@ -6,9 +6,9 @@ services:
     staticPublishPath: prototipo-confidencialidad
     envVars:
       - key: ENTRA_TENANT
-        value: bakertilly.co
+        value: 100c493f-7265-4dd6-9a05-63e1a210e604
       - key: ENTRA_CLIENT_ID
-        sync: false
+        value: 9d3e6808-f124-4324-875c-7e6da0b0a3bf
       - key: ALLOWED_EMAIL_DOMAIN
         value: "@bakertilly.co"
       - key: EMAIL_WEBHOOK_URL
