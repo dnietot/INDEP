@@ -1,9 +1,23 @@
 const fs = require("fs");
 const path = require("path");
 
+const defaultTenantId = "100c493f-7265-4dd6-9a05-63e1a210e604";
+const defaultClientId = "9d3e6808-f124-4324-875c-7e6da0b0a3bf";
+const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizeTenant(value) {
+  const tenant = (value || "").trim();
+  return tenant.toLowerCase() === "bakertilly.co" || !tenant ? defaultTenantId : tenant;
+}
+
+function normalizeClientId(value) {
+  const clientId = (value || "").trim();
+  return guidPattern.test(clientId) ? clientId : defaultClientId;
+}
+
 const config = {
-  tenant: process.env.ENTRA_TENANT || "100c493f-7265-4dd6-9a05-63e1a210e604",
-  clientId: process.env.ENTRA_CLIENT_ID || "9d3e6808-f124-4324-875c-7e6da0b0a3bf",
+  tenant: normalizeTenant(process.env.ENTRA_TENANT),
+  clientId: normalizeClientId(process.env.ENTRA_CLIENT_ID),
   allowedEmailDomain: process.env.ALLOWED_EMAIL_DOMAIN || "@bakertilly.co",
   temporaryLoginEnabled: process.env.TEMP_LOGIN_ENABLED !== "false",
   temporaryLoginName: process.env.TEMP_LOGIN_NAME || "Diego Nieto",

@@ -4,9 +4,23 @@ let currentUser = {
   role: "user"
 };
 
+const defaultTenantId = "100c493f-7265-4dd6-9a05-63e1a210e604";
+const defaultClientId = "9d3e6808-f124-4324-875c-7e6da0b0a3bf";
+const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizeTenant(value) {
+  const tenant = (value || "").trim();
+  return tenant.toLowerCase() === "bakertilly.co" || !tenant ? defaultTenantId : tenant;
+}
+
+function normalizeClientId(value) {
+  const clientId = (value || "").trim();
+  return guidPattern.test(clientId) ? clientId : defaultClientId;
+}
+
 const office365Auth = {
-  tenant: window.CONFIDENCIALIDAD_CONFIG?.tenant || "100c493f-7265-4dd6-9a05-63e1a210e604",
-  clientId: window.CONFIDENCIALIDAD_CONFIG?.clientId || "9d3e6808-f124-4324-875c-7e6da0b0a3bf",
+  tenant: normalizeTenant(window.CONFIDENCIALIDAD_CONFIG?.tenant),
+  clientId: normalizeClientId(window.CONFIDENCIALIDAD_CONFIG?.clientId),
   scopes: ["User.Read"]
 };
 
