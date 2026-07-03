@@ -12,6 +12,12 @@ const office365Auth = {
 
 const allowedEmailDomain = window.CONFIDENCIALIDAD_CONFIG?.allowedEmailDomain || "@bakertilly.co";
 const graphMeEndpoint = "https://graph.microsoft.com/v1.0/me";
+const temporaryLogin = {
+  enabled: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEnabled !== false,
+  name: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginName || "Diego Nieto",
+  email: (window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEmail || "diego.nieto@bakertilly.co").toLowerCase(),
+  passwordHash: window.CONFIDENCIALIDAD_CONFIG?.temporaryPasswordHash || "8ff2593d80ac7ff8a06a33e35c9ee1ee9d72fb8fd9e9d7c9b57b36d139563543"
+};
 
 const accessTeam = [
   "accesos@bakertilly.co",
@@ -63,6 +69,9 @@ let msalClient = null;
 
 const authScreen = document.querySelector("#authScreen");
 const appShell = document.querySelector("#appShell");
+const passwordLoginForm = document.querySelector("#passwordLoginForm");
+const passwordEmail = document.querySelector("#passwordEmail");
+const passwordInput = document.querySelector("#passwordInput");
 const loginButton = document.querySelector("#loginButton");
 const logoutButton = document.querySelector("#logoutButton");
 const sessionName = document.querySelector("#sessionName");
@@ -254,6 +263,54 @@ function getRedirectUri() {
   return `${window.location.origin}${window.location.pathname}`;
 }
 
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(value);
+  const hashBuffer = await window.crypto.subtle.digest("SHA-256", bytes);
+
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function rememberTemporarySession() {
+  sessionStorage.setItem("temporaryPasswordSession", "true");
+}
+
+function forgetTemporarySession() {
+  sessionStorage.removeItem("temporaryPasswordSession");
+}
+
+function applyTemporaryUser() {
+  currentUser = {
+    name: temporaryLogin.name,
+    email: temporaryLogin.email,
+    role: currentUser.role
+  };
+}
+
+async function loginWithPassword(event) {
+  event.preventDefault();
+
+  if (!temporaryLogin.enabled) {
+    showToast("El ingreso temporal con contrasena no esta habilitado.");
+    return;
+  }
+
+  const email = passwordEmail.value.trim().toLowerCase();
+  const passwordHash = await sha256Hex(passwordInput.value);
+
+  if (email !== temporaryLogin.email || passwordHash !== temporaryLogin.passwordHash) {
+    passwordInput.value = "";
+    showToast("Correo o contrasena incorrectos.");
+    return;
+  }
+
+  applyTemporaryUser();
+  rememberTemporarySession();
+  passwordInput.value = "";
+  startSession();
+}
+
 function hasValidClientIdFormat() {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(office365Auth.clientId);
 }
@@ -401,6 +458,12 @@ async function finishOffice365Redirect() {
     return;
   }
 
+  if (sessionStorage.getItem("temporaryPasswordSession") === "true") {
+    applyTemporaryUser();
+    startSession();
+    return;
+  }
+
   const client = getMsalClient();
   if (!client) return;
 
@@ -423,6 +486,7 @@ async function logout() {
   selectedClient = null;
   history = [];
   surveyForm.reset();
+  forgetTemporarySession();
 
   if (client && activeAccount) {
     await client.logoutRedirect({
@@ -436,6 +500,8 @@ async function logout() {
   appShell.classList.add("is-hidden");
 }
 
+passwordEmail.value = temporaryLogin.email;
+passwordLoginForm.addEventListener("submit", loginWithPassword);
 loginButton.addEventListener("click", redirectToOffice365);
 logoutButton.addEventListener("click", logout);
 searchInput.addEventListener("input", renderClients);

@@ -33,6 +33,10 @@ Configurar estas variables de entorno:
 | ENTRA_TENANT | `bakertilly.co` |
 | ENTRA_CLIENT_ID | GUID real del Application (client) ID entregado por TI |
 | ALLOWED_EMAIL_DOMAIN | `@bakertilly.co` |
+| TEMP_LOGIN_ENABLED | `true` |
+| TEMP_LOGIN_NAME | Nombre de la persona autorizada |
+| TEMP_LOGIN_EMAIL | Correo de la persona autorizada |
+| TEMP_LOGIN_PASSWORD_HASH | Hash SHA-256 de la contrasena temporal |
 
 ## Solicitud a TI
 
@@ -70,3 +74,20 @@ xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
 No usar textos como `Application (client) ID entregado por TI`; Render los enviaria como `client_id` y Microsoft Entra responderia con `AADSTS700016`.
+
+## Ingreso temporal por contrasena
+
+Mientras TI habilita Microsoft Entra ID, se puede validar la app con una sola persona usando correo y contrasena temporal.
+
+Valores iniciales:
+
+```text
+TEMP_LOGIN_ENABLED=true
+TEMP_LOGIN_NAME=Diego Nieto
+TEMP_LOGIN_EMAIL=diego.nieto@bakertilly.co
+TEMP_LOGIN_PASSWORD_HASH=8ff2593d80ac7ff8a06a33e35c9ee1ee9d72fb8fd9e9d7c9b57b36d139563543
+```
+
+La contrasena inicial correspondiente a ese hash es `Indep2026*`.
+
+Este control vive en el navegador porque el sitio es estatico. Sirve para una demo visual, pero no debe usarse para datos reales o confidenciales.
