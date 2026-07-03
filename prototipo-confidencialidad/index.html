@@ -32,7 +32,6 @@
         </form>
         <div class="auth-divider"><span>Office 365</span></div>
         <button class="secondary wide" id="loginButton" type="button">
-          <span aria-hidden="true" class="button-icon">□</span>
           Entrar con Office 365
         </button>
       </section>
@@ -52,8 +51,8 @@
             <span class="session-name" id="sessionName"></span>
             <span class="session-mail" id="sessionMail"></span>
           </div>
-          <button class="icon-button" id="logoutButton" type="button" title="Cerrar sesión" aria-label="Cerrar sesión">
-            ×
+          <button class="icon-button" id="logoutButton" type="button" title="Cerrar sesion" aria-label="Cerrar sesion">
+            x
           </button>
         </div>
       </header>
@@ -83,7 +82,7 @@
             <span class="status-dot" aria-label="Conectado"></span>
           </div>
           <label class="search-box">
-            <span aria-hidden="true">⌕</span>
+            <span aria-hidden="true">?</span>
             <input id="searchInput" type="search" placeholder="Buscar cliente o NIT">
           </label>
           <div class="client-list" id="clientList"></div>
@@ -93,7 +92,7 @@
           <div class="empty-state" id="emptyState">
             <div class="empty-symbol" aria-hidden="true">C</div>
             <h2>Selecciona un cliente</h2>
-            <p>El formulario quedará asociado al cliente y al usuario autenticado.</p>
+            <p>El formulario quedara asociado al cliente y al usuario autenticado.</p>
           </div>
 
           <form class="survey-form is-hidden" id="surveyForm">
@@ -103,59 +102,47 @@
                 <h2 id="selectedClientName"></h2>
                 <p class="muted" id="selectedClientMeta"></p>
               </div>
-              <span class="risk-pill" id="riskPill">Pendiente</span>
             </div>
 
             <fieldset>
               <legend>Acceso solicitado</legend>
               <div class="form-grid">
+                <div>
+                  <span class="field-label">Accesos requeridos</span>
+                  <div class="checks compact">
+                    <label><input type="checkbox" name="tipoAcceso" value="Huddle"> Huddle</label>
+                    <label><input type="checkbox" name="tipoAcceso" value="Focus"> Focus</label>
+                  </div>
+                </div>
                 <label>
-                  Tipo de acceso
-                  <select name="tipoAcceso" required>
-                    <option value="">Seleccionar</option>
-                    <option>Huddle</option>
-                    <option>Focus</option>
-                  </select>
-                </label>
-                <label>
-                  Vigencia máxima
+                  Vigencia maxima
                   <input name="vigencia" type="date" required>
                 </label>
               </div>
             </fieldset>
 
             <fieldset>
-              <legend>Clasificación de información</legend>
-              <div class="segmented">
-                <label><input type="radio" name="clasificacion" value="Interna" required> Interna</label>
-                <label><input type="radio" name="clasificacion" value="Confidencial"> Confidencial</label>
-                <label><input type="radio" name="clasificacion" value="Restringida"> Restringida</label>
-              </div>
-              <div class="checks">
-                <label><input type="checkbox" name="datosPersonales"> Datos personales</label>
-                <label><input type="checkbox" name="datosFinancieros"> Información financiera</label>
-                <label><input type="checkbox" name="datosLegales"> Información legal o sensible</label>
-              </div>
-            </fieldset>
-
-            <fieldset>
-              <legend>Justificación</legend>
+              <legend>Trabajo a desarrollar</legend>
               <label>
-                Motivo de la solicitud
-                <textarea name="justificacion" rows="5" required placeholder="Describe el alcance del acceso y la actividad que lo requiere"></textarea>
+                Describe el trabajo que vas a desarrollar
+                <textarea name="trabajo" rows="5" required placeholder="Describe el alcance del trabajo, actividad o procedimiento que requiere el acceso"></textarea>
               </label>
             </fieldset>
 
             <label class="consent">
+              <input type="checkbox" name="sinConflicto" required>
+              Garantizo que no tengo conflicto de interes para desarrollar este trabajo.
+            </label>
+
+            <label class="consent">
               <input type="checkbox" name="aceptacion" required>
-              Confirmo que usaré la información únicamente para actividades autorizadas por la compañía.
+              Confirmo que usare la informacion unicamente para actividades autorizadas por la compania.
             </label>
 
             <div class="form-actions">
               <button class="secondary" type="button" id="clearButton">Limpiar</button>
-              <button class="primary" type="submit">
-                <span aria-hidden="true" class="button-icon">›</span>
-                Enviar a accesos
+              <button class="primary" id="submitSurveyButton" type="submit" disabled>
+                Solicitar accesos
               </button>
             </div>
           </form>
@@ -166,7 +153,7 @@
                 <p class="eyebrow">Correo preparado</p>
                 <h2 id="mailTitle">Solicitud enviada</h2>
               </div>
-              <button class="icon-button" id="closePreview" type="button" title="Cerrar" aria-label="Cerrar">×</button>
+              <button class="icon-button" id="closePreview" type="button" title="Cerrar" aria-label="Cerrar">x</button>
             </div>
             <dl>
               <div>
@@ -190,7 +177,7 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Trazabilidad</p>
-            <h2 id="historyTitle">Últimos envíos</h2>
+            <h2 id="historyTitle">Ultimos envios</h2>
           </div>
         </div>
         <div class="table-wrap">
@@ -200,7 +187,7 @@
                 <th>Fecha</th>
                 <th>Cliente</th>
                 <th>Solicitante</th>
-                <th>Clasificación</th>
+                <th>Accesos</th>
                 <th>Estado</th>
               </tr>
             </thead>

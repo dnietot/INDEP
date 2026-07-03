@@ -45,7 +45,7 @@ const clients = [
   },
   {
     id: "CLI-003",
-    name: "Servicios Logísticos Delta",
+    name: "Servicios Logisticos Delta",
     nit: "901.431.771-4",
     serviceLine: "BPO",
     manager: "Mariana Cruz",
@@ -79,10 +79,10 @@ const sessionMail = document.querySelector("#sessionMail");
 const searchInput = document.querySelector("#searchInput");
 const clientList = document.querySelector("#clientList");
 const surveyForm = document.querySelector("#surveyForm");
+const submitSurveyButton = document.querySelector("#submitSurveyButton");
 const emptyState = document.querySelector("#emptyState");
 const selectedClientName = document.querySelector("#selectedClientName");
 const selectedClientMeta = document.querySelector("#selectedClientMeta");
-const riskPill = document.querySelector("#riskPill");
 const clearButton = document.querySelector("#clearButton");
 const mailPreview = document.querySelector("#mailPreview");
 const closePreview = document.querySelector("#closePreview");
@@ -125,14 +125,14 @@ function renderClients() {
   mine.forEach((client) => {
     const item = document.createElement("article");
     item.className = `client-item${selectedClient?.id === client.id ? " is-selected" : ""}`;
-
     const statusClass = client.confidentialityStatus === "Pendiente" ? "pending" : "done";
+
     item.innerHTML = `
       <div class="client-top">
         <div>
           <p class="client-name">${client.name}</p>
           <p class="client-meta">NIT ${client.nit}</p>
-          <p class="client-line">${client.serviceLine} · ${client.manager}</p>
+          <p class="client-line">${client.serviceLine} - ${client.manager}</p>
         </div>
         <span class="badge ${statusClass}">${client.confidentialityStatus}</span>
       </div>
@@ -150,13 +150,13 @@ function selectClient(clientId) {
   if (!selectedClient) return;
 
   selectedClientName.textContent = selectedClient.name;
-  selectedClientMeta.textContent = `${selectedClient.id} · NIT ${selectedClient.nit} · ${selectedClient.serviceLine}`;
+  selectedClientMeta.textContent = `${selectedClient.id} - NIT ${selectedClient.nit} - ${selectedClient.serviceLine}`;
   emptyState.classList.add("is-hidden");
   surveyForm.classList.remove("is-hidden");
   mailPreview.classList.add("is-hidden");
   surveyForm.reset();
   setDefaultDate();
-  updateRisk();
+  updateSubmitState();
   renderClients();
 }
 
@@ -166,25 +166,19 @@ function setDefaultDate() {
   surveyForm.elements.vigencia.value = date.toISOString().slice(0, 10);
 }
 
-function updateRisk() {
-  const classification = surveyForm.elements.clasificacion.value;
-  const checkedSensitive = ["datosPersonales", "datosFinancieros", "datosLegales"]
-    .some((name) => surveyForm.elements[name].checked);
+function getSelectedAccesses(formData = new FormData(surveyForm)) {
+  return formData.getAll("tipoAcceso");
+}
 
-  riskPill.className = "risk-pill";
+function updateSubmitState() {
+  const formData = new FormData(surveyForm);
+  const hasAccess = getSelectedAccesses(formData).length > 0;
+  const hasDate = Boolean(formData.get("vigencia"));
+  const hasWork = Boolean((formData.get("trabajo") || "").trim());
+  const hasNoConflict = formData.get("sinConflicto") === "on";
+  const hasConfirmation = formData.get("aceptacion") === "on";
 
-  if (classification === "Restringida" || (classification === "Confidencial" && checkedSensitive)) {
-    riskPill.textContent = "Riesgo alto";
-    riskPill.classList.add("high");
-  } else if (classification === "Confidencial" || checkedSensitive) {
-    riskPill.textContent = "Riesgo medio";
-    riskPill.classList.add("medium");
-  } else if (classification === "Interna") {
-    riskPill.textContent = "Riesgo bajo";
-    riskPill.classList.add("low");
-  } else {
-    riskPill.textContent = "Pendiente";
-  }
+  submitSurveyButton.disabled = !(hasAccess && hasDate && hasWork && hasNoConflict && hasConfirmation);
 }
 
 function showToast(message) {
@@ -200,7 +194,7 @@ function renderHistory() {
   if (history.length === 0) {
     historyRows.innerHTML = `
       <tr>
-        <td colspan="5" class="muted">Sin envíos registrados en esta sesión.</td>
+        <td colspan="5" class="muted">Sin envios registrados en esta sesion.</td>
       </tr>
     `;
     return;
@@ -212,7 +206,7 @@ function renderHistory() {
       <td>${item.date}</td>
       <td>${item.clientName}</td>
       <td>${item.user}</td>
-      <td>${item.classification}</td>
+      <td>${item.accesses}</td>
       <td><span class="badge done">Correo preparado</span></td>
     `;
     historyRows.append(row);
@@ -220,15 +214,17 @@ function renderHistory() {
 }
 
 function buildEmailPreview(formData) {
+  const accesses = getSelectedAccesses(formData).join(", ");
   const subject = `[Confidencialidad] Solicitud de acceso - ${selectedClient.name} - ${currentUser.email}`;
   const body = [
     `Cliente: ${selectedClient.name}`,
     `NIT: ${selectedClient.nit}`,
     `Solicitante: ${currentUser.name} (${currentUser.email})`,
-    `Tipo de acceso: ${formData.get("tipoAcceso")}`,
-    `Clasificación: ${formData.get("clasificacion")}`,
-    `Vigencia máxima: ${formData.get("vigencia")}`,
-    `Justificación: ${formData.get("justificacion")}`
+    `Accesos solicitados: ${accesses}`,
+    `Vigencia maxima: ${formData.get("vigencia")}`,
+    `Trabajo a desarrollar: ${formData.get("trabajo")}`,
+    "Sin conflicto de interes: Si",
+    "Confirmacion de uso autorizado: Si"
   ].join(" | ");
 
   mailTo.textContent = accessTeam.join("; ");
@@ -242,13 +238,19 @@ function submitSurvey(event) {
   if (!selectedClient) return;
 
   const formData = new FormData(surveyForm);
-  const now = new Date();
+  const accesses = getSelectedAccesses(formData);
 
+  if (accesses.length === 0 || submitSurveyButton.disabled) {
+    showToast("Selecciona los accesos y confirma las declaraciones requeridas.");
+    return;
+  }
+
+  const now = new Date();
   history.unshift({
     date: now.toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
     clientName: selectedClient.name,
     user: currentUser.email,
-    classification: formData.get("clasificacion")
+    accesses: accesses.join(", ")
   });
 
   selectedClient.confidentialityStatus = "Vigente";
@@ -256,6 +258,7 @@ function submitSurvey(event) {
   renderHistory();
   renderClients();
   renderMetrics();
+  updateSubmitState();
   showToast("Encuesta registrada y correo preparado para accesos.");
 }
 
@@ -317,7 +320,7 @@ function hasValidClientIdFormat() {
 
 function getClientIdConfigMessage() {
   if (office365Auth.clientId === "REEMPLAZAR_CLIENT_ID_ENTRA") {
-    return "Configura el Application (client) ID real de Entra ID antes de iniciar sesión.";
+    return "Configura el Application (client) ID real de Entra ID antes de iniciar sesion.";
   }
 
   if (!hasValidClientIdFormat()) {
@@ -344,7 +347,7 @@ function getMsalClient(options = {}) {
 
   if (typeof msal === "undefined") {
     if (!quiet) {
-      showToast("No se pudo cargar MSAL. Revisa la conexión a internet e intenta de nuevo.");
+      showToast("No se pudo cargar MSAL. Revisa la conexion a internet e intenta de nuevo.");
     }
     return null;
   }
@@ -475,7 +478,7 @@ async function finishOffice365Redirect() {
       await loadProfileAndStartSession(account);
     }
   } catch (error) {
-    showToast("No se pudo completar el inicio de sesión con Office 365.");
+    showToast("No se pudo completar el inicio de sesion con Office 365.");
   }
 }
 
@@ -505,13 +508,14 @@ passwordLoginForm.addEventListener("submit", loginWithPassword);
 loginButton.addEventListener("click", redirectToOffice365);
 logoutButton.addEventListener("click", logout);
 searchInput.addEventListener("input", renderClients);
-surveyForm.addEventListener("change", updateRisk);
-surveyForm.addEventListener("input", updateRisk);
+surveyForm.addEventListener("change", updateSubmitState);
+surveyForm.addEventListener("input", updateSubmitState);
 surveyForm.addEventListener("submit", submitSurvey);
 clearButton.addEventListener("click", () => {
   surveyForm.reset();
   setDefaultDate();
-  updateRisk();
+  mailPreview.classList.add("is-hidden");
+  updateSubmitState();
 });
 closePreview.addEventListener("click", () => mailPreview.classList.add("is-hidden"));
 

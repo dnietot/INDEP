@@ -170,6 +170,11 @@ h2 {
   background: var(--teal-dark);
 }
 
+.primary:disabled {
+  background: var(--line-strong);
+  cursor: not-allowed;
+}
+
 .secondary {
   background: #eef2f4;
   color: var(--text);
@@ -462,6 +467,12 @@ label {
   font-weight: 700;
 }
 
+.field-label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: 700;
+}
+
 select,
 input[type="date"],
 textarea {
@@ -504,6 +515,11 @@ textarea {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.checks.compact {
+  margin-top: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .checks label,

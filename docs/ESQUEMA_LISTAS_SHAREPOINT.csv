@@ -14,13 +14,10 @@ EncuestasConfidencialidad,EncuestaId,Texto corto,Si,Consecutivo o GUID
 EncuestasConfidencialidad,ClienteId,Busqueda,Si,Referencia a Clientes
 EncuestasConfidencialidad,UsuarioUPN,Texto corto,Si,Correo corporativo del solicitante
 EncuestasConfidencialidad,FechaEnvio,Fecha y hora,Si,Fecha de registro
-EncuestasConfidencialidad,TipoAcceso,Opcion,Si,"Huddle; Focus"
-EncuestasConfidencialidad,ClasificacionInformacion,Opcion,Si,"Interna; Confidencial; Restringida"
-EncuestasConfidencialidad,DatosPersonales,Si/No,No,Contiene datos personales
-EncuestasConfidencialidad,DatosFinancieros,Si/No,No,Contiene informacion financiera
-EncuestasConfidencialidad,DatosLegales,Si/No,No,Contiene informacion legal o sensible
+EncuestasConfidencialidad,AccesosSolicitados,Eleccion multiple,Si,"Huddle; Focus"
 EncuestasConfidencialidad,VigenciaAcceso,Fecha,Si,Fecha maxima solicitada
-EncuestasConfidencialidad,Justificacion,Varias lineas,Si,Motivo del acceso
+EncuestasConfidencialidad,TrabajoADesarrollar,Varias lineas,Si,Trabajo que requiere el acceso
+EncuestasConfidencialidad,SinConflictoInteres,Si/No,Si,Garantia del usuario sobre conflicto de interes
 EncuestasConfidencialidad,AceptacionConfidencialidad,Si/No,Si,Confirmacion del usuario
 EncuestasConfidencialidad,EstadoCorreo,Opcion,Si,"Pendiente; Enviado; Error"
 EncargadosAccesos,Area,Opcion,Si,"Accesos; Seguridad; TI; Auditoria"

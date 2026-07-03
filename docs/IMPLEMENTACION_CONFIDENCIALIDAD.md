@@ -48,13 +48,10 @@ Esta ruta aprovecha las credenciales corporativas de Microsoft 365, permite publ
 | ClienteId | Busqueda a Clientes | Cliente evaluado |
 | UsuarioUPN | Texto corto | Usuario que diligencia |
 | FechaEnvio | Fecha y hora | Momento de envio |
-| TipoAcceso | Opcion | Huddle, Focus |
-| ClasificacionInformacion | Opcion | Interna, Confidencial, Restringida |
-| DatosPersonales | Si/No | Manejo de datos personales |
-| DatosFinancieros | Si/No | Manejo de informacion financiera |
-| DatosLegales | Si/No | Manejo de informacion legal o sensible |
+| AccesosSolicitados | Eleccion multiple | Huddle, Focus |
 | VigenciaAcceso | Fecha | Fecha maxima solicitada |
-| Justificacion | Varias lineas | Motivo de la solicitud |
+| TrabajoADesarrollar | Varias lineas | Trabajo que requiere el acceso |
+| SinConflictoInteres | Si/No | Garantia del usuario sobre conflicto de interes |
 | AceptacionConfidencialidad | Si/No | Confirmacion del usuario |
 | EstadoCorreo | Opcion | Pendiente, Enviado, Error |
 
@@ -107,9 +104,10 @@ If(
     FlujoEnviarCorreoConfidencialidad.Run(
         varClienteSeleccionado.ClienteId,
         User().Email,
-        DataCardValue_TipoAcceso.Selected.Value,
-        DataCardValue_Clasificacion.Selected.Value,
-        DataCardValue_Justificacion.Text
+        Concat(DataCardValue_Accesos.SelectedItems, Value, ", "),
+        DataCardValue_Trabajo.Text,
+        DataCardValue_SinConflicto.Value,
+        DataCardValue_Aceptacion.Value
     );
     Notify("Encuesta enviada a encargados de accesos.", NotificationType.Success);
     Back()
@@ -143,9 +141,10 @@ Acciones:
   <tr><td><strong>Cliente</strong></td><td>{NombreCliente}</td></tr>
   <tr><td><strong>NIT</strong></td><td>{NIT}</td></tr>
   <tr><td><strong>Solicitante</strong></td><td>{UsuarioUPN}</td></tr>
-  <tr><td><strong>Tipo de acceso</strong></td><td>{TipoAcceso}</td></tr>
-  <tr><td><strong>Clasificacion</strong></td><td>{ClasificacionInformacion}</td></tr>
-  <tr><td><strong>Justificacion</strong></td><td>{Justificacion}</td></tr>
+  <tr><td><strong>Accesos solicitados</strong></td><td>{AccesosSolicitados}</td></tr>
+  <tr><td><strong>Trabajo a desarrollar</strong></td><td>{TrabajoADesarrollar}</td></tr>
+  <tr><td><strong>Sin conflicto de interes</strong></td><td>{SinConflictoInteres}</td></tr>
+  <tr><td><strong>Confirmacion</strong></td><td>{AceptacionConfidencialidad}</td></tr>
 </table>
 ```
 
