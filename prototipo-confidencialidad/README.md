@@ -35,6 +35,7 @@ TEMP_LOGIN_ENABLED=true
 TEMP_LOGIN_NAME=Diego Nieto
 TEMP_LOGIN_EMAIL=diego.nieto@bakertilly.co
 TEMP_LOGIN_PASSWORD_HASH=8ff2593d80ac7ff8a06a33e35c9ee1ee9d72fb8fd9e9d7c9b57b36d139563543
+EMAIL_WEBHOOK_URL=<URL del flujo de Power Automate>
 ```
 
 `ENTRA_CLIENT_ID` debe ser el GUID real de Microsoft Entra ID. No pegues textos como `Application client ID`, `Application (client) ID entregado por TI` ni valores entre corchetes.
@@ -42,6 +43,8 @@ TEMP_LOGIN_PASSWORD_HASH=8ff2593d80ac7ff8a06a33e35c9ee1ee9d72fb8fd9e9d7c9b57b36d
 Cuando Render entregue la URL `https://...onrender.com/`, TI debe registrarla como redirect URI de tipo Single-page application en Microsoft Entra ID.
 
 El ingreso temporal por contrasena es solo para demo. La contrasena inicial es `Indep2026*`.
+
+Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura, la app enviara la solicitud al flujo de Power Automate.
 
 ## Prueba con Office 365 real
 

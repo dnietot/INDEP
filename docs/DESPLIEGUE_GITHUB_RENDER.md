@@ -37,6 +37,7 @@ Configurar estas variables de entorno:
 | TEMP_LOGIN_NAME | Nombre de la persona autorizada |
 | TEMP_LOGIN_EMAIL | Correo de la persona autorizada |
 | TEMP_LOGIN_PASSWORD_HASH | Hash SHA-256 de la contrasena temporal |
+| EMAIL_WEBHOOK_URL | URL del flujo de Power Automate que enviara el correo |
 
 ## Solicitud a TI
 
@@ -91,3 +92,48 @@ TEMP_LOGIN_PASSWORD_HASH=8ff2593d80ac7ff8a06a33e35c9ee1ee9d72fb8fd9e9d7c9b57b36d
 La contrasena inicial correspondiente a ese hash es `Indep2026*`.
 
 Este control vive en el navegador porque el sitio es estatico. Sirve para una demo visual, pero no debe usarse para datos reales o confidenciales.
+
+## Envio automatico de correo
+
+Para la prueba rapida, usar Power Automate:
+
+1. Crear un flujo automatizado con el disparador `When an HTTP request is received`.
+2. En el flujo, convertir el cuerpo recibido a JSON. Si llega como texto, usar la expresion:
+
+```text
+json(triggerBody())
+```
+
+3. Agregar la accion Office 365 Outlook `Send an email (V2)`.
+4. Usar como destinatarios los encargados de accesos, por ejemplo:
+
+```text
+accesos@bakertilly.co; seguridad.informacion@bakertilly.co
+```
+
+5. Asunto sugerido:
+
+```text
+[Confidencialidad] Solicitud de acceso - @{outputs('Compose')?['clientName']} - @{outputs('Compose')?['requesterEmail']}
+```
+
+6. Cuerpo sugerido:
+
+```html
+<p>Se registro una nueva solicitud de acceso.</p>
+<table>
+  <tr><td><strong>Cliente</strong></td><td>@{outputs('Compose')?['clientName']}</td></tr>
+  <tr><td><strong>NIT</strong></td><td>@{outputs('Compose')?['nit']}</td></tr>
+  <tr><td><strong>Solicitante</strong></td><td>@{outputs('Compose')?['requesterName']} (@{outputs('Compose')?['requesterEmail']})</td></tr>
+  <tr><td><strong>Accesos solicitados</strong></td><td>@{outputs('Compose')?['accesses']}</td></tr>
+  <tr><td><strong>Vigencia maxima</strong></td><td>@{outputs('Compose')?['expiresAt']}</td></tr>
+  <tr><td><strong>Trabajo a desarrollar</strong></td><td>@{outputs('Compose')?['workToDevelop']}</td></tr>
+  <tr><td><strong>Sin conflicto de interes</strong></td><td>Si</td></tr>
+  <tr><td><strong>Confirmacion de uso autorizado</strong></td><td>Si</td></tr>
+</table>
+```
+
+7. Guardar el flujo y copiar la URL HTTP generada.
+8. En Render, agregar la variable `EMAIL_WEBHOOK_URL` con esa URL y hacer redeploy.
+
+Nota: esta URL funciona como un secreto. Para demo esta bien, pero en produccion debe ocultarse detras de un backend o autenticacion real.

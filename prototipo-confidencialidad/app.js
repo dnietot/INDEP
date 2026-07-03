@@ -12,6 +12,7 @@ const office365Auth = {
 
 const allowedEmailDomain = window.CONFIDENCIALIDAD_CONFIG?.allowedEmailDomain || "@bakertilly.co";
 const graphMeEndpoint = "https://graph.microsoft.com/v1.0/me";
+const emailWebhookUrl = window.CONFIDENCIALIDAD_CONFIG?.emailWebhookUrl || "";
 const temporaryLogin = {
   enabled: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEnabled !== false,
   name: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginName || "Diego Nieto",
@@ -213,16 +214,37 @@ function renderHistory() {
   });
 }
 
-function buildEmailPreview(formData) {
+function buildAccessRequestPayload(formData) {
   const accesses = getSelectedAccesses(formData).join(", ");
-  const subject = `[Confidencialidad] Solicitud de acceso - ${selectedClient.name} - ${currentUser.email}`;
+
+  return {
+    requestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    submittedAt: new Date().toISOString(),
+    clientId: selectedClient.id,
+    clientName: selectedClient.name,
+    nit: selectedClient.nit,
+    serviceLine: selectedClient.serviceLine,
+    manager: selectedClient.manager,
+    requesterName: currentUser.name,
+    requesterEmail: currentUser.email,
+    accesses,
+    expiresAt: formData.get("vigencia"),
+    workToDevelop: formData.get("trabajo"),
+    noConflictOfInterest: true,
+    authorizedUseConfirmation: true,
+    recipients: accessTeam
+  };
+}
+
+function buildEmailPreview(payload) {
+  const subject = `[Confidencialidad] Solicitud de acceso - ${payload.clientName} - ${payload.requesterEmail}`;
   const body = [
-    `Cliente: ${selectedClient.name}`,
-    `NIT: ${selectedClient.nit}`,
-    `Solicitante: ${currentUser.name} (${currentUser.email})`,
-    `Accesos solicitados: ${accesses}`,
-    `Vigencia maxima: ${formData.get("vigencia")}`,
-    `Trabajo a desarrollar: ${formData.get("trabajo")}`,
+    `Cliente: ${payload.clientName}`,
+    `NIT: ${payload.nit}`,
+    `Solicitante: ${payload.requesterName} (${payload.requesterEmail})`,
+    `Accesos solicitados: ${payload.accesses}`,
+    `Vigencia maxima: ${payload.expiresAt}`,
+    `Trabajo a desarrollar: ${payload.workToDevelop}`,
     "Sin conflicto de interes: Si",
     "Confirmacion de uso autorizado: Si"
   ].join(" | ");
@@ -233,7 +255,24 @@ function buildEmailPreview(formData) {
   mailPreview.classList.remove("is-hidden");
 }
 
-function submitSurvey(event) {
+async function sendEmailWebhook(payload) {
+  if (!emailWebhookUrl) {
+    return false;
+  }
+
+  await fetch(emailWebhookUrl, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return true;
+}
+
+async function submitSurvey(event) {
   event.preventDefault();
   if (!selectedClient) return;
 
@@ -245,6 +284,7 @@ function submitSurvey(event) {
     return;
   }
 
+  const payload = buildAccessRequestPayload(formData);
   const now = new Date();
   history.unshift({
     date: now.toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
@@ -254,12 +294,20 @@ function submitSurvey(event) {
   });
 
   selectedClient.confidentialityStatus = "Vigente";
-  buildEmailPreview(formData);
+  buildEmailPreview(payload);
   renderHistory();
   renderClients();
   renderMetrics();
   updateSubmitState();
-  showToast("Encuesta registrada y correo preparado para accesos.");
+
+  try {
+    const sentToWebhook = await sendEmailWebhook(payload);
+    showToast(sentToWebhook
+      ? "Solicitud registrada y enviada al flujo de correo."
+      : "Solicitud registrada. Falta configurar EMAIL_WEBHOOK_URL para enviar el correo.");
+  } catch (error) {
+    showToast("Solicitud registrada, pero no se pudo llamar el flujo de correo.");
+  }
 }
 
 function getRedirectUri() {
