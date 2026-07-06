@@ -208,8 +208,39 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function getSmtpConfig() {
+  const user = normalizeEmail(process.env.SMTP_USER || process.env.SMTP_FROM);
+
+  return {
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT || 465),
+    user,
+    password: String(process.env.SMTP_PASS || "").replace(/\s+/g, ""),
+    from: normalizeEmail(process.env.SMTP_FROM || user),
+    timeoutMs: Number(process.env.SMTP_TIMEOUT_MS || 12000)
+  };
+}
+
+function smtpStatus() {
+  const config = getSmtpConfig();
+  const missing = [];
+
+  if (!config.user) missing.push("SMTP_USER");
+  if (!config.password) missing.push("SMTP_PASS");
+
+  return {
+    configured: missing.length === 0,
+    missing,
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    from: config.from,
+    accessTeamEmails
+  };
+}
+
 function smtpConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  return smtpStatus().configured;
 }
 
 function smtpResponseReader(socket) {
@@ -264,16 +295,17 @@ async function sendSmtpMail({ to, subject, text, html }) {
     return { ok: false, skipped: true, error: "No recipients" };
   }
 
-  if (!smtpConfigured()) {
-    return { ok: false, skipped: true, error: "SMTP not configured" };
+  const currentSmtpStatus = smtpStatus();
+
+  if (!currentSmtpStatus.configured) {
+    return {
+      ok: false,
+      skipped: true,
+      error: `SMTP not configured: missing ${currentSmtpStatus.missing.join(", ")}`
+    };
   }
 
-  const host = process.env.SMTP_HOST;
-  const portNumber = Number(process.env.SMTP_PORT || 465);
-  const user = process.env.SMTP_USER;
-  const password = process.env.SMTP_PASS;
-  const from = normalizeEmail(process.env.SMTP_FROM || user);
-  const timeoutMs = Number(process.env.SMTP_TIMEOUT_MS || 12000);
+  const { host, port: portNumber, user, password, from, timeoutMs } = getSmtpConfig();
 
   return await new Promise((resolve, reject) => {
     const socket = tls.connect({
@@ -562,6 +594,15 @@ async function handleAccessApproval(request, response, url) {
   `);
 }
 
+async function handleSmtpStatus(request, response) {
+  if (request.method !== "GET") {
+    sendJson(response, 405, { ok: false, error: "Method not allowed" });
+    return;
+  }
+
+  sendJson(response, 200, smtpStatus());
+}
+
 function safeStaticPath(pathname) {
   const decodedPath = decodeURIComponent(pathname === "/" ? "/index.html" : pathname);
   const requestedPath = path.normalize(path.join(publicDir, decodedPath));
@@ -605,6 +646,11 @@ const server = http.createServer(async (request, response) => {
 
   if (url.pathname === "/api/access-records/approve") {
     await handleAccessApproval(request, response, url);
+    return;
+  }
+
+  if (url.pathname === "/api/smtp-status") {
+    await handleSmtpStatus(request, response);
     return;
   }
 

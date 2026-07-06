@@ -31,6 +31,7 @@ const clientsCsvUrl = window.CONFIDENCIALIDAD_CONFIG?.clientsCsvUrl || "clientes
 const assignmentsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.assignmentsApiUrl || "/api/assignments";
 const accessRecordsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.accessRecordsApiUrl || "/api/access-records";
 const approvalApiUrl = `${accessRecordsApiUrl.replace(/\/$/, "")}/approve`;
+const smtpStatusApiUrl = "/api/smtp-status";
 const showAllClientsWhenUnassigned = window.CONFIDENCIALIDAD_CONFIG?.showAllClientsWhenUnassigned === true;
 const temporaryLogin = {
   enabled: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEnabled !== false,
@@ -116,6 +117,7 @@ let msalClient = null;
 let remoteAssignmentsEnabled = false;
 let remoteAccessRecordsEnabled = false;
 let accessRecordsRefreshTimer = null;
+let smtpStatus = null;
 
 const authScreen = document.querySelector("#authScreen");
 const appShell = document.querySelector("#appShell");
@@ -410,6 +412,21 @@ async function loadRemoteAccessRecords() {
 async function loadAccessRecords() {
   const remoteRecords = await loadRemoteAccessRecords();
   return remoteRecords || loadLocalAccessRecords();
+}
+
+async function loadSmtpStatus() {
+  try {
+    const response = await fetch(smtpStatusApiUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`SMTP status returned ${response.status}`);
+    }
+
+    smtpStatus = await response.json();
+  } catch (error) {
+    smtpStatus = null;
+  }
+
+  renderSmtpStatus();
 }
 
 async function saveRemoteAccessRecords(records) {
@@ -928,9 +945,12 @@ async function approvePartnerRequest(requestId) {
     renderMetrics();
     renderAdminPanel();
     renderPartnerApprovalPanel();
+    const pendingMessage = payload.record?.mailError
+      ? `Solicitud aprobada. Correo pendiente: ${payload.record.mailError}`
+      : "Solicitud aprobada. El correo final queda pendiente de configuracion SMTP.";
     showToast(payload.record?.approvalStatus === "sent_to_access_team"
       ? "Solicitud aprobada y enviada al equipo de accesos."
-      : "Solicitud aprobada. El correo final queda pendiente de configuracion SMTP.");
+      : pendingMessage);
   } catch (error) {
     showToast("No se pudo aprobar la solicitud. Revisa la configuracion o intenta de nuevo.");
   }
@@ -973,11 +993,24 @@ function renderAssignmentSelector() {
   updateAssignmentFields();
 }
 
+function renderSmtpStatus() {
+  if (!smtpConfigInput) return;
+
+  if (!smtpStatus) {
+    smtpConfigInput.value = `Remitente previsto: ${requestSenderEmail}`;
+    return;
+  }
+
+  smtpConfigInput.value = smtpStatus.configured
+    ? `SMTP listo: ${smtpStatus.from || smtpStatus.user}`
+    : `Falta configurar: ${(smtpStatus.missing || []).join(", ") || "SMTP"}`;
+}
+
 function renderAdminPanel() {
   adminPanel.classList.toggle("is-hidden", !isAdmin());
   if (!isAdmin()) return;
 
-  smtpConfigInput.value = `Remitente previsto: ${requestSenderEmail}`;
+  renderSmtpStatus();
   renderAssignmentSelector();
   adminClientsRows.innerHTML = "";
   adminAccessRows.innerHTML = "";
@@ -1262,6 +1295,9 @@ function startSession() {
   renderAdminPanel();
   renderPartnerApprovalPanel();
   renderMetrics();
+  if (isAdmin()) {
+    loadSmtpStatus();
+  }
   startAccessRecordsRefresh();
 }
 

@@ -47,9 +47,9 @@ Configurar estas variables de entorno:
 | ACCESS_TEAM_EMAILS | Correos que reciben la solicitud despues de la aprobacion |
 | SMTP_HOST | `smtp.gmail.com` |
 | SMTP_PORT | `465` |
-| SMTP_USER | Correo Gmail remitente |
+| SMTP_USER | `dnieto@arca-col.com` |
 | SMTP_PASS | App password de Gmail, guardar como secreto |
-| SMTP_FROM | Correo Gmail remitente |
+| SMTP_FROM | `dnieto@arca-col.com` |
 | CLIENTS_CSV_URL | `clientes.csv` |
 | ASSIGNMENTS_API_URL | `/api/assignments` |
 | ACCESS_RECORDS_API_URL | `/api/access-records` |
@@ -142,11 +142,14 @@ APP_BASE_URL=https://indep.onrender.com
 ACCESS_TEAM_EMAILS=dnieto@bakertilly.co
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
-SMTP_USER=<correo gmail>
+SMTP_USER=dnieto@arca-col.com
 SMTP_PASS=<app password>
-SMTP_FROM=<correo gmail>
+SMTP_FROM=dnieto@arca-col.com
 ```
 
+La app password se puede pegar con o sin espacios; el backend limpia los espacios antes de conectarse a Gmail. Aun asi, en Render es mejor guardarla sin espacios.
+
 5. Hacer redeploy.
+6. Validar el estado en `https://indep.onrender.com/api/smtp-status`. Debe responder `configured: true`. Si responde `missing: ["SMTP_PASS"]`, falta guardar la app password en Render.
 
 Al registrar una solicitud, el sistema notifica al socio del cliente por correo. El socio debe entrar a `https://indep.onrender.com` con su correo Baker, ver sus clientes y aprobar las solicitudes pendientes desde su perfil. Al aprobar, el backend registra la aprobacion y envia el correo final a `ACCESS_TEAM_EMAILS`. Si Gmail no esta configurado, la solicitud queda guardada con estado pendiente y el panel admin muestra el detalle tecnico.
