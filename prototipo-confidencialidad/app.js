@@ -140,6 +140,7 @@ const clientAdminForm = document.querySelector("#clientAdminForm");
 const assignmentClientSelect = document.querySelector("#assignmentClientSelect");
 const assignmentClientMeta = document.querySelector("#assignmentClientMeta");
 const assignmentEmailsInput = document.querySelector("#assignmentEmailsInput");
+const exportClientsCsvButton = document.querySelector("#exportClientsCsvButton");
 const adminClientsRows = document.querySelector("#adminClientsRows");
 const adminAccessRows = document.querySelector("#adminAccessRows");
 
@@ -225,6 +226,7 @@ function clientsFromCsv(text) {
       const nit = getCsvValue(row, "nit", "NIT");
       const huddleName = getCsvValue(row, "nombre en huddle", "huddle", "nombre huddle") || name;
       const focusName = getCsvValue(row, "nombre en focus", "focus", "nombre focus") || name;
+      const assignedTo = parseAssignedTo(getCsvValue(row, "correos asignados", "asignados", "assigned to", "assignedTo"));
 
       return {
         id: buildClientIdFromNit(nit, index),
@@ -234,7 +236,7 @@ function clientsFromCsv(text) {
         focusName,
         serviceLine: "Sin linea",
         manager: "Sin responsable",
-        assignedTo: [],
+        assignedTo,
         confidentialityStatus: "Pendiente"
       };
     })
@@ -1139,6 +1141,40 @@ function saveClientAssignments(clientId, value) {
   showToast(assignedTo.length > 0 ? "Asignaciones guardadas." : "Asignaciones eliminadas.");
 }
 
+function escapeCsvValue(value) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function buildClientsCsv() {
+  const headers = ["nombre", "NIT", "nombre en huddle", "nombre en focus", "correos asignados"];
+  const rows = clients.map((client) => [
+    client.name,
+    client.nit,
+    client.huddleName,
+    client.focusName,
+    (client.assignedTo || []).join("; ")
+  ]);
+
+  return [headers, ...rows]
+    .map((row) => row.map(escapeCsvValue).join(","))
+    .join("\n");
+}
+
+function downloadClientsCsv() {
+  const blob = new Blob([buildClientsCsv()], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "clientes.csv";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showToast("CSV de clientes generado.");
+}
+
 passwordEmail.value = temporaryLogin.email;
 passwordLoginForm.addEventListener("submit", loginWithPassword);
 loginButton.addEventListener("click", redirectToOffice365);
@@ -1147,6 +1183,7 @@ emailConfigForm.addEventListener("submit", handleEmailConfigSubmit);
 clearWebhookButton.addEventListener("click", clearWebhookConfig);
 clientAdminForm.addEventListener("submit", handleClientAdminSubmit);
 assignmentClientSelect.addEventListener("change", updateAssignmentFields);
+exportClientsCsvButton.addEventListener("click", downloadClientsCsv);
 searchInput.addEventListener("input", renderClients);
 surveyForm.addEventListener("change", updateSubmitState);
 surveyForm.addEventListener("input", updateSubmitState);

@@ -111,7 +111,7 @@ Contrasena: Admin2026*
 
 El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o Focus, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
 
-Importante: como Render esta publicando un sitio estatico, el catalogo base de clientes se lee desde `clientes.csv`, pero las asignaciones guardadas desde el panel quedan en `localStorage` del navegador. Es util para validar pantallas y flujo, pero no sincroniza datos entre usuarios. Para que el admin gestione informacion real compartida se necesita conectar la app a SharePoint Lists, Dataverse, una API/backend o una base de datos.
+Importante: como Render esta publicando un sitio estatico, el catalogo base de clientes se lee desde `clientes.csv`. El archivo soporta las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y `correos asignados`. El panel admin puede descargar un CSV actualizado, pero para que esas asignaciones sean globales se debe reemplazar `clientes.csv` en el repositorio y desplegar de nuevo, o conectar la app a SharePoint Lists, Dataverse, una API/backend o una base de datos.
 
 Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve clientes cuando su correo esta asignado por admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 
