@@ -122,6 +122,14 @@
             </fieldset>
 
             <fieldset>
+              <legend>Usuarios que requieren acceso</legend>
+              <label>
+                Correos Baker
+                <textarea name="usuariosAcceso" rows="3" required placeholder="correo1@bakertilly.co, correo2@bakertilly.co"></textarea>
+              </label>
+            </fieldset>
+
+            <fieldset>
               <legend>Trabajo a desarrollar</legend>
               <label>
                 Describe el trabajo que vas a desarrollar
@@ -270,6 +278,7 @@
                   <th>Plataformas</th>
                   <th>Vigencia</th>
                   <th>Trabajo</th>
+                  <th>Solicitado por</th>
                 </tr>
               </thead>
               <tbody id="adminAccessRows"></tbody>
@@ -292,6 +301,7 @@
                 <th>Fecha</th>
                 <th>Cliente</th>
                 <th>Solicitante</th>
+                <th>Usuarios</th>
                 <th>Accesos</th>
                 <th>Estado</th>
               </tr>
@@ -304,8 +314,8 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="env.js?v=20260706-assignments"></script>
+    <script src="env.js?v=20260706-multiuser-access"></script>
     <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
-    <script src="app.js?v=20260706-assignments"></script>
+    <script src="app.js?v=20260706-multiuser-access"></script>
   </body>
 </html>

@@ -5,7 +5,7 @@ Este prototipo muestra el flujo esperado:
 1. Entrada con Office 365.
 2. Listado de clientes asignados al usuario.
 3. Boton Confidencialidad por cliente.
-4. Formulario de encuesta.
+4. Formulario de encuesta con uno o varios correos Baker que requieren acceso.
 5. Confirmacion del correo que se enviaria a encargados de accesos.
 6. Panel admin para ver clientes, solicitudes y configurar la URL del flujo de correo.
 
@@ -61,9 +61,9 @@ Usuario admin: admin
 Contrasena admin: Admin2026*
 ```
 
-El perfil `admin` puede ver todos los clientes, revisar las solicitudes registradas, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
+El perfil `admin` puede ver todos los clientes, revisar las solicitudes registradas por correo Baker y plataforma, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
 
-Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate.
+Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate. El cuerpo enviado incluye `requestedUsers` como arreglo y `requestedUserEmails` como texto separado por comas.
 
 Nota: el panel admin guarda clientes, solicitudes, asignaciones y URL del flujo en `localStorage`. Eso sirve para validar el comportamiento desde un navegador, pero no es una base compartida entre usuarios. Para produccion se necesita backend, SharePoint Lists, Dataverse o una base de datos.
 

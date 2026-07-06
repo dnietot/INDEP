@@ -146,6 +146,7 @@ accesos@bakertilly.co; seguridad.informacion@bakertilly.co
   <tr><td><strong>Cliente</strong></td><td>@{outputs('Compose')?['clientName']}</td></tr>
   <tr><td><strong>NIT</strong></td><td>@{outputs('Compose')?['nit']}</td></tr>
   <tr><td><strong>Solicitante</strong></td><td>@{outputs('Compose')?['requesterName']} (@{outputs('Compose')?['requesterEmail']})</td></tr>
+  <tr><td><strong>Usuarios que requieren acceso</strong></td><td>@{outputs('Compose')?['requestedUserEmails']}</td></tr>
   <tr><td><strong>Accesos solicitados</strong></td><td>@{outputs('Compose')?['accesses']}</td></tr>
   <tr><td><strong>Vigencia maxima</strong></td><td>@{outputs('Compose')?['expiresAt']}</td></tr>
   <tr><td><strong>Trabajo a desarrollar</strong></td><td>@{outputs('Compose')?['workToDevelop']}</td></tr>

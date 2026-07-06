@@ -168,6 +168,7 @@ function buildHistoryFromAccessRecords() {
     date: new Date(record.submittedAt).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
     clientName: record.clientName,
     user: record.requesterEmail,
+    requestedUsers: getRecordRequestedUsers(record).join(", "),
     accesses: record.accesses
   }));
 }
@@ -217,8 +218,42 @@ function parseAssignedTo(value) {
     .filter(Boolean);
 }
 
+function parseRequestedUsers(value) {
+  return uniqueValues(String(value || "")
+    .split(/[,\n;]/)
+    .map(normalizeEmail)
+    .filter(Boolean));
+}
+
+function isBakerEmail(value) {
+  const email = normalizeEmail(value);
+  return email.includes("@") && email.endsWith(allowedEmailDomain);
+}
+
+function getRecordRequestedUsers(record) {
+  if (Array.isArray(record.requestedUsers)) {
+    return uniqueValues(record.requestedUsers);
+  }
+
+  if (Array.isArray(record.requestedUserEmails)) {
+    return uniqueValues(record.requestedUserEmails);
+  }
+
+  if (typeof record.requestedUserEmails === "string") {
+    const users = parseRequestedUsers(record.requestedUserEmails);
+    return users.length > 0 ? users : uniqueValues([record.requesterEmail]);
+  }
+
+  return uniqueValues([record.requesterEmail]);
+}
+
+function formatUsersForTextarea(users) {
+  return uniqueValues(users).join(", ");
+}
+
 function uniqueValues(values) {
-  return [...new Set(values.map(normalizeEmail).filter(Boolean))];
+  const list = Array.isArray(values) ? values : [values];
+  return [...new Set(list.map(normalizeEmail).filter(Boolean))];
 }
 
 function currentUserEmails() {
@@ -320,6 +355,7 @@ function selectClient(clientId) {
   mailPreview.classList.add("is-hidden");
   surveyForm.reset();
   setDefaultDate();
+  setDefaultRequestedUsers();
   updateSubmitState();
   renderClients();
 }
@@ -330,6 +366,10 @@ function setDefaultDate() {
   surveyForm.elements.vigencia.value = date.toISOString().slice(0, 10);
 }
 
+function setDefaultRequestedUsers() {
+  surveyForm.elements.usuariosAcceso.value = formatUsersForTextarea([currentUser.email]);
+}
+
 function getSelectedAccesses(formData = new FormData(surveyForm)) {
   return formData.getAll("tipoAcceso");
 }
@@ -337,12 +377,14 @@ function getSelectedAccesses(formData = new FormData(surveyForm)) {
 function updateSubmitState() {
   const formData = new FormData(surveyForm);
   const hasAccess = getSelectedAccesses(formData).length > 0;
+  const requestedUsers = parseRequestedUsers(formData.get("usuariosAcceso"));
+  const hasValidRequestedUsers = requestedUsers.length > 0 && requestedUsers.every(isBakerEmail);
   const hasDate = Boolean(formData.get("vigencia"));
   const hasWork = Boolean((formData.get("trabajo") || "").trim());
   const hasNoConflict = formData.get("sinConflicto") === "on";
   const hasConfirmation = formData.get("aceptacion") === "on";
 
-  submitSurveyButton.disabled = !(hasAccess && hasDate && hasWork && hasNoConflict && hasConfirmation);
+  submitSurveyButton.disabled = !(hasAccess && hasValidRequestedUsers && hasDate && hasWork && hasNoConflict && hasConfirmation);
 }
 
 function showToast(message) {
@@ -360,7 +402,7 @@ function renderHistory() {
   if (history.length === 0) {
     historyRows.innerHTML = `
       <tr>
-        <td colspan="5" class="muted">Sin envios registrados en esta sesion.</td>
+        <td colspan="6" class="muted">Sin envios registrados en esta sesion.</td>
       </tr>
     `;
     return;
@@ -369,13 +411,27 @@ function renderHistory() {
   history.forEach((item) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${item.date}</td>
-      <td>${item.clientName}</td>
-      <td>${item.user}</td>
-      <td>${item.accesses}</td>
+      <td>${escapeHtml(item.date)}</td>
+      <td>${escapeHtml(item.clientName)}</td>
+      <td>${escapeHtml(item.user)}</td>
+      <td>${escapeHtml(item.requestedUsers)}</td>
+      <td>${escapeHtml(item.accesses)}</td>
       <td><span class="badge done">Correo preparado</span></td>
     `;
     historyRows.append(row);
+  });
+}
+
+function buildAccessSummaryRows() {
+  return accessRecords.flatMap((record) => {
+    return getRecordRequestedUsers(record).map((requestedUser) => ({
+      clientName: record.clientName,
+      requestedUser,
+      accesses: record.accesses,
+      expiresAt: record.expiresAt,
+      workToDevelop: record.workToDevelop,
+      requesterEmail: record.requesterEmail
+    }));
   });
 }
 
@@ -406,23 +462,26 @@ function renderAdminPanel() {
     adminClientsRows.append(row);
   });
 
-  if (accessRecords.length === 0) {
+  const accessRows = buildAccessSummaryRows();
+
+  if (accessRows.length === 0) {
     adminAccessRows.innerHTML = `
       <tr>
-        <td colspan="5" class="muted">Aun no hay accesos solicitados.</td>
+        <td colspan="6" class="muted">Aun no hay accesos solicitados.</td>
       </tr>
     `;
     return;
   }
 
-  accessRecords.forEach((record) => {
+  accessRows.forEach((record) => {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${escapeHtml(record.clientName)}</td>
-      <td>${escapeHtml(record.requesterEmail)}</td>
+      <td>${escapeHtml(record.requestedUser)}</td>
       <td>${escapeHtml(record.accesses)}</td>
       <td>${escapeHtml(record.expiresAt)}</td>
       <td>${escapeHtml(record.workToDevelop)}</td>
+      <td>${escapeHtml(record.requesterEmail)}</td>
     `;
     adminAccessRows.append(row);
   });
@@ -430,6 +489,7 @@ function renderAdminPanel() {
 
 function buildAccessRequestPayload(formData) {
   const accesses = getSelectedAccesses(formData).join(", ");
+  const requestedUsers = parseRequestedUsers(formData.get("usuariosAcceso"));
 
   return {
     requestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -441,6 +501,8 @@ function buildAccessRequestPayload(formData) {
     manager: selectedClient.manager,
     requesterName: currentUser.name,
     requesterEmail: currentUser.email,
+    requestedUsers,
+    requestedUserEmails: requestedUsers.join(", "),
     accesses,
     expiresAt: formData.get("vigencia"),
     workToDevelop: formData.get("trabajo"),
@@ -456,6 +518,7 @@ function buildEmailPreview(payload) {
     `Cliente: ${payload.clientName}`,
     `NIT: ${payload.nit}`,
     `Solicitante: ${payload.requesterName} (${payload.requesterEmail})`,
+    `Usuarios que requieren acceso: ${payload.requestedUserEmails}`,
     `Accesos solicitados: ${payload.accesses}`,
     `Vigencia maxima: ${payload.expiresAt}`,
     `Trabajo a desarrollar: ${payload.workToDevelop}`,
@@ -494,9 +557,15 @@ async function submitSurvey(event) {
 
   const formData = new FormData(surveyForm);
   const accesses = getSelectedAccesses(formData);
+  const requestedUsers = parseRequestedUsers(formData.get("usuariosAcceso"));
+
+  if (requestedUsers.length === 0 || !requestedUsers.every(isBakerEmail)) {
+    showToast(`Agrega correos validos que terminen en ${allowedEmailDomain}.`);
+    return;
+  }
 
   if (accesses.length === 0 || submitSurveyButton.disabled) {
-    showToast("Selecciona los accesos y confirma las declaraciones requeridas.");
+    showToast("Selecciona los accesos, usuarios y confirma las declaraciones requeridas.");
     return;
   }
 
@@ -893,6 +962,7 @@ surveyForm.addEventListener("submit", submitSurvey);
 clearButton.addEventListener("click", () => {
   surveyForm.reset();
   setDefaultDate();
+  setDefaultRequestedUsers();
   mailPreview.classList.add("is-hidden");
   updateSubmitState();
 });

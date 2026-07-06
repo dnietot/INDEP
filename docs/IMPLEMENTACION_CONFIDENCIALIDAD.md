@@ -47,6 +47,7 @@ Esta ruta aprovecha las credenciales corporativas de Microsoft 365, permite publ
 | EncuestaId | Texto corto | Consecutivo o GUID |
 | ClienteId | Busqueda a Clientes | Cliente evaluado |
 | UsuarioUPN | Texto corto | Usuario que diligencia |
+| UsuariosAcceso | Varias lineas | Correos Baker que requieren acceso para el cliente |
 | FechaEnvio | Fecha y hora | Momento de envio |
 | AccesosSolicitados | Eleccion multiple | Huddle, Focus |
 | VigenciaAcceso | Fecha | Fecha maxima solicitada |
@@ -141,6 +142,7 @@ Acciones:
   <tr><td><strong>Cliente</strong></td><td>{NombreCliente}</td></tr>
   <tr><td><strong>NIT</strong></td><td>{NIT}</td></tr>
   <tr><td><strong>Solicitante</strong></td><td>{UsuarioUPN}</td></tr>
+  <tr><td><strong>Usuarios que requieren acceso</strong></td><td>{UsuariosAcceso}</td></tr>
   <tr><td><strong>Accesos solicitados</strong></td><td>{AccesosSolicitados}</td></tr>
   <tr><td><strong>Trabajo a desarrollar</strong></td><td>{TrabajoADesarrollar}</td></tr>
   <tr><td><strong>Sin conflicto de interes</strong></td><td>{SinConflictoInteres}</td></tr>
