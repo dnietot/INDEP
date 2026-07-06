@@ -390,9 +390,8 @@ async function sendPartnerApprovalRequest(record) {
 }
 
 async function sendAccessRequestToTeam(record) {
-  const recipients = record.recipients?.length ? record.recipients : accessTeamEmails;
   return await sendSmtpMail({
-    to: recipients,
+    to: accessTeamEmails,
     subject: `[Confidencialidad] Solicitud aprobada - ${record.clientName} - ${record.requesterEmail}`,
     text: `Solicitud aprobada para ${record.clientName} por ${record.approvedBy || record.partnerEmail}.`,
     html: `

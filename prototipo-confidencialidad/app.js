@@ -49,11 +49,6 @@ const clientsStorageKey = "confidencialidadClients";
 const clientAssignmentsStorageKey = "confidencialidadClientAssignments";
 const accessRecordsStorageKey = "confidencialidadAccessRecords";
 
-const accessTeam = [
-  "accesos@bakertilly.co",
-  "seguridad.informacion@bakertilly.co"
-];
-
 const defaultClients = [
   {
     id: "CLI-001",
@@ -849,7 +844,8 @@ function getRecordPartnerEmails(record) {
 }
 
 function isPendingPartnerApproval(record) {
-  return getApprovalStatus(record) === "pending_partner";
+  const status = getApprovalStatus(record);
+  return status === "pending_partner" || status === "approved_pending_email";
 }
 
 function isRecordPendingForCurrentPartner(record) {
@@ -884,6 +880,7 @@ function renderPartnerApprovalPanel() {
 
   approvals.forEach((record) => {
     const row = document.createElement("tr");
+    const approvalAction = getApprovalStatus(record) === "approved_pending_email" ? "Enviar correo" : "Aprobar";
     row.innerHTML = `
       <td>${escapeHtml(record.clientName)}</td>
       <td>${escapeHtml(record.requesterEmail)}</td>
@@ -892,7 +889,7 @@ function renderPartnerApprovalPanel() {
       <td>${escapeHtml(record.workToDevelop)}</td>
       <td><span class="badge pending">${escapeHtml(getApprovalStatusLabel(record))}</span></td>
       <td>
-        <button class="primary small-button" type="button" data-approve-request="${escapeHtml(record.requestId)}">Aprobar</button>
+        <button class="primary small-button" type="button" data-approve-request="${escapeHtml(record.requestId)}">${escapeHtml(approvalAction)}</button>
       </td>
     `;
     partnerApprovalRows.append(row);
@@ -1060,8 +1057,7 @@ function buildAccessRequestPayload(formData) {
     expiresAt: formData.get("vigencia"),
     workToDevelop: formData.get("trabajo"),
     noConflictOfInterest: true,
-    authorizedUseConfirmation: true,
-    recipients: accessTeam
+    authorizedUseConfirmation: true
   };
 }
 
