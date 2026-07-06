@@ -209,7 +209,8 @@ function escapeHtml(value) {
 }
 
 function getSmtpConfig() {
-  const user = normalizeEmail(process.env.SMTP_USER || process.env.SMTP_FROM);
+  const defaultSmtpUser = "dnieto@arca-col.com";
+  const user = normalizeEmail(process.env.SMTP_USER || process.env.SMTP_FROM || defaultSmtpUser);
 
   return {
     host: process.env.SMTP_HOST || "smtp.gmail.com",
