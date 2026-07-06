@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: confidencialidad-clientes
+    name: indep
     runtime: node
     buildCommand: node build-render-config.js
     startCommand: node server.js

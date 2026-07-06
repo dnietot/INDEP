@@ -6,7 +6,7 @@ Publicar el prototipo como servicio Node para obtener una URL HTTPS estable de R
 
 ## Preparar GitHub
 
-1. Crear un repositorio en GitHub, por ejemplo `confidencialidad-clientes`.
+1. Usar el repositorio de GitHub `dnietot/INDEP`.
 2. Subir estos archivos al repositorio.
 3. Mantener la rama principal como `main`.
 
@@ -49,10 +49,10 @@ Configurar estas variables de entorno:
 
 ## Solicitud a TI
 
-Cuando Render entregue la URL, por ejemplo:
+Cuando Render entregue la URL:
 
 ```text
-https://confidencialidad-clientes.onrender.com/
+https://indep.onrender.com/
 ```
 
 pedir a TI registrar esa URL como redirect URI de tipo Single-page application en Microsoft Entra ID.
