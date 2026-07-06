@@ -209,32 +209,19 @@
           <form class="admin-form" id="clientAdminForm">
             <div>
               <p class="eyebrow">Clientes</p>
-              <h3>Agregar cliente</h3>
-            </div>
-            <div class="form-grid">
-              <label>
-                Nombre cliente
-                <input name="name" type="text" required>
-              </label>
-              <label>
-                NIT
-                <input name="nit" type="text" required>
-              </label>
-              <label>
-                Linea
-                <input name="serviceLine" type="text" required>
-              </label>
-              <label>
-                Responsable
-                <input name="manager" type="text" required>
-              </label>
+              <h3>Asignar correos</h3>
             </div>
             <label>
-              Correos asignados
-              <input name="assignedTo" type="text" placeholder="correo1@bakertilly.co, correo2@bakertilly.co, *@bakertilly.co" required>
+              Cliente
+              <select id="assignmentClientSelect" name="clientId" required></select>
+            </label>
+            <p class="muted" id="assignmentClientMeta"></p>
+            <label>
+              Correos Baker asignados
+              <textarea id="assignmentEmailsInput" name="assignedTo" rows="4" placeholder="correo1@bakertilly.co, correo2@bakertilly.co"></textarea>
             </label>
             <div class="form-actions">
-              <button class="primary" type="submit">Agregar cliente</button>
+              <button class="primary" type="submit">Guardar asignacion</button>
             </div>
           </form>
         </div>
@@ -252,7 +239,8 @@
                 <tr>
                   <th>Cliente</th>
                   <th>NIT</th>
-                  <th>Linea</th>
+                  <th>Huddle</th>
+                  <th>Focus</th>
                   <th>Asignados</th>
                   <th>Accion</th>
                 </tr>
@@ -314,8 +302,8 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="env.js?v=20260706-multiuser-access"></script>
+    <script src="env.js?v=20260706-csv-clients"></script>
     <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
-    <script src="app.js?v=20260706-multiuser-access"></script>
+    <script src="app.js?v=20260706-csv-clients"></script>
   </body>
 </html>

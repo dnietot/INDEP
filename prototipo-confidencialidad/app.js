@@ -27,7 +27,8 @@ const office365Auth = {
 const allowedEmailDomain = window.CONFIDENCIALIDAD_CONFIG?.allowedEmailDomain || "@bakertilly.co";
 const graphMeEndpoint = "https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName,otherMails";
 const emailWebhookUrl = window.CONFIDENCIALIDAD_CONFIG?.emailWebhookUrl || "";
-const showAllClientsWhenUnassigned = window.CONFIDENCIALIDAD_CONFIG?.showAllClientsWhenUnassigned !== false;
+const clientsCsvUrl = window.CONFIDENCIALIDAD_CONFIG?.clientsCsvUrl || "clientes.csv";
+const showAllClientsWhenUnassigned = window.CONFIDENCIALIDAD_CONFIG?.showAllClientsWhenUnassigned === true;
 const temporaryLogin = {
   enabled: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEnabled !== false,
   name: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginName || "Diego Nieto",
@@ -42,6 +43,7 @@ const temporaryAdmin = {
   passwordHash: window.CONFIDENCIALIDAD_CONFIG?.temporaryAdminPasswordHash || "8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec"
 };
 const clientsStorageKey = "confidencialidadClients";
+const clientAssignmentsStorageKey = "confidencialidadClientAssignments";
 const accessRecordsStorageKey = "confidencialidadAccessRecords";
 const webhookStorageKey = "confidencialidadEmailWebhookUrl";
 
@@ -55,41 +57,49 @@ const defaultClients = [
     id: "CLI-001",
     name: "Andes Retail S.A.S.",
     nit: "900.100.200-1",
-    serviceLine: "Auditoria",
-    manager: "Laura Mendoza",
-    assignedTo: ["diego.nieto@bakertilly.co"],
+    huddleName: "Andes Retail S.A.S.",
+    focusName: "Andes Retail",
+    serviceLine: "Sin linea",
+    manager: "Sin responsable",
+    assignedTo: [],
     confidentialityStatus: "Pendiente"
   },
   {
     id: "CLI-002",
     name: "Constructora Norte Ltda.",
     nit: "830.222.118-7",
-    serviceLine: "Impuestos",
-    manager: "Felipe Rojas",
-    assignedTo: ["diego.nieto@bakertilly.co"],
+    huddleName: "Constructora Norte Ltda.",
+    focusName: "Constructora Norte",
+    serviceLine: "Sin linea",
+    manager: "Sin responsable",
+    assignedTo: [],
     confidentialityStatus: "Vigente"
   },
   {
     id: "CLI-003",
     name: "Servicios Logisticos Delta",
     nit: "901.431.771-4",
-    serviceLine: "BPO",
-    manager: "Mariana Cruz",
-    assignedTo: ["diego.nieto@bakertilly.co"],
+    huddleName: "Servicios Logisticos Delta",
+    focusName: "Logisticos Delta",
+    serviceLine: "Sin linea",
+    manager: "Sin responsable",
+    assignedTo: [],
     confidentialityStatus: "Pendiente"
   },
   {
     id: "CLI-004",
     name: "Fondo Aurora",
     nit: "800.765.330-8",
-    serviceLine: "Consultoria",
-    manager: "Camilo Vargas",
-    assignedTo: ["otro.usuario@bakertilly.co"],
+    huddleName: "Fondo Aurora",
+    focusName: "Fondo Aurora",
+    serviceLine: "Sin linea",
+    manager: "Sin responsable",
+    assignedTo: [],
     confidentialityStatus: "Pendiente"
   }
 ];
 
-let clients = loadClients();
+let clients = cloneDefaultClients();
 let selectedClient = null;
 let accessRecords = loadAccessRecords();
 let history = buildHistoryFromAccessRecords();
@@ -127,6 +137,9 @@ const emailConfigForm = document.querySelector("#emailConfigForm");
 const webhookUrlInput = document.querySelector("#webhookUrlInput");
 const clearWebhookButton = document.querySelector("#clearWebhookButton");
 const clientAdminForm = document.querySelector("#clientAdminForm");
+const assignmentClientSelect = document.querySelector("#assignmentClientSelect");
+const assignmentClientMeta = document.querySelector("#assignmentClientMeta");
+const assignmentEmailsInput = document.querySelector("#assignmentEmailsInput");
 const adminClientsRows = document.querySelector("#adminClientsRows");
 const adminAccessRows = document.querySelector("#adminAccessRows");
 
@@ -137,16 +150,159 @@ function cloneDefaultClients() {
   }));
 }
 
-function loadClients() {
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      value += '"';
+      index += 1;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      row.push(value);
+      value = "";
+    } else if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") {
+        index += 1;
+      }
+      row.push(value);
+      if (row.some((cell) => cell.trim())) {
+        rows.push(row);
+      }
+      row = [];
+      value = "";
+    } else {
+      value += char;
+    }
+  }
+
+  row.push(value);
+  if (row.some((cell) => cell.trim())) {
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function normalizeCsvHeader(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function getCsvValue(row, ...keys) {
+  const normalized = keys.map(normalizeCsvHeader);
+  const key = Object.keys(row).find((candidate) => normalized.includes(candidate));
+  return key ? row[key] : "";
+}
+
+function buildClientIdFromNit(nit, index) {
+  const cleanNit = String(nit || "").replace(/[^0-9a-z]/gi, "");
+  return cleanNit ? `NIT-${cleanNit}` : `CSV-${index + 1}`;
+}
+
+function clientsFromCsv(text) {
+  const rows = parseCsv(text);
+  const headers = rows.shift()?.map(normalizeCsvHeader) || [];
+
+  return rows
+    .map((cells, index) => {
+      const row = headers.reduce((accumulator, header, cellIndex) => {
+        accumulator[header] = String(cells[cellIndex] || "").trim();
+        return accumulator;
+      }, {});
+      const name = getCsvValue(row, "nombre", "cliente", "nombre cliente");
+      const nit = getCsvValue(row, "nit", "NIT");
+      const huddleName = getCsvValue(row, "nombre en huddle", "huddle", "nombre huddle") || name;
+      const focusName = getCsvValue(row, "nombre en focus", "focus", "nombre focus") || name;
+
+      return {
+        id: buildClientIdFromNit(nit, index),
+        name,
+        nit,
+        huddleName,
+        focusName,
+        serviceLine: "Sin linea",
+        manager: "Sin responsable",
+        assignedTo: [],
+        confidentialityStatus: "Pendiente"
+      };
+    })
+    .filter((client) => client.name && client.nit);
+}
+
+function loadLegacyClients() {
   try {
     const saved = localStorage.getItem(clientsStorageKey);
-    return saved ? JSON.parse(saved) : cloneDefaultClients();
+    return saved ? JSON.parse(saved) : [];
   } catch (error) {
-    return cloneDefaultClients();
+    return [];
+  }
+}
+
+function loadClientAssignments() {
+  try {
+    const saved = localStorage.getItem(clientAssignmentsStorageKey);
+    return saved ? JSON.parse(saved) : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function findLegacyClient(client, legacyClients) {
+  return legacyClients.find((legacy) => {
+    return legacy.id === client.id || legacy.nit === client.nit || normalizeEmail(legacy.name) === normalizeEmail(client.name);
+  });
+}
+
+function applySavedClientState(baseClients) {
+  const assignments = loadClientAssignments();
+  const legacyClients = loadLegacyClients();
+
+  return baseClients.map((client) => {
+    const legacy = findLegacyClient(client, legacyClients);
+    const savedAssignments = assignments[client.id] || assignments[client.nit];
+
+    return {
+      ...client,
+      assignedTo: uniqueValues(savedAssignments || client.assignedTo || []),
+      confidentialityStatus: legacy?.confidentialityStatus || client.confidentialityStatus || "Pendiente"
+    };
+  });
+}
+
+async function loadClients() {
+  try {
+    const response = await fetch(clientsCsvUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`CSV returned ${response.status}`);
+    }
+
+    const csvClients = clientsFromCsv(await response.text());
+    return applySavedClientState(csvClients.length > 0 ? csvClients : cloneDefaultClients());
+  } catch (error) {
+    return applySavedClientState(cloneDefaultClients());
   }
 }
 
 function saveClients() {
+  const assignments = clients.reduce((accumulator, client) => {
+    accumulator[client.id] = uniqueValues(client.assignedTo || []);
+    accumulator[client.nit] = uniqueValues(client.assignedTo || []);
+    return accumulator;
+  }, {});
+
+  localStorage.setItem(clientAssignmentsStorageKey, JSON.stringify(assignments));
   localStorage.setItem(clientsStorageKey, JSON.stringify(clients));
 }
 
@@ -308,7 +464,7 @@ function renderMetrics() {
 function renderClients() {
   const query = searchInput.value.trim().toLowerCase();
   const mine = assignedClients().filter((client) => {
-    return `${client.name} ${client.nit} ${client.serviceLine}`.toLowerCase().includes(query);
+    return `${client.name} ${client.nit} ${client.huddleName} ${client.focusName}`.toLowerCase().includes(query);
   });
 
   clientList.innerHTML = "";
@@ -316,7 +472,9 @@ function renderClients() {
   if (mine.length === 0) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "No hay clientes para el filtro actual.";
+    empty.textContent = query
+      ? "No hay clientes para el filtro actual."
+      : "No tienes clientes asignados. Un admin debe asignar tu correo a un cliente.";
     clientList.append(empty);
     return;
   }
@@ -329,9 +487,10 @@ function renderClients() {
     item.innerHTML = `
       <div class="client-top">
         <div>
-          <p class="client-name">${client.name}</p>
-          <p class="client-meta">NIT ${client.nit}</p>
-          <p class="client-line">${client.serviceLine} - ${client.manager}</p>
+          <p class="client-name">${escapeHtml(client.name)}</p>
+          <p class="client-meta">NIT ${escapeHtml(client.nit)}</p>
+          <p class="client-line">Huddle: ${escapeHtml(client.huddleName)}</p>
+          <p class="client-line">Focus: ${escapeHtml(client.focusName)}</p>
         </div>
         <span class="badge ${statusClass}">${client.confidentialityStatus}</span>
       </div>
@@ -349,7 +508,7 @@ function selectClient(clientId) {
   if (!selectedClient) return;
 
   selectedClientName.textContent = selectedClient.name;
-  selectedClientMeta.textContent = `${selectedClient.id} - NIT ${selectedClient.nit} - ${selectedClient.serviceLine}`;
+  selectedClientMeta.textContent = `NIT ${selectedClient.nit} - Huddle: ${selectedClient.huddleName} - Focus: ${selectedClient.focusName}`;
   emptyState.classList.add("is-hidden");
   surveyForm.classList.remove("is-hidden");
   mailPreview.classList.add("is-hidden");
@@ -435,11 +594,44 @@ function buildAccessSummaryRows() {
   });
 }
 
+function updateAssignmentFields() {
+  const client = clients.find((item) => item.id === assignmentClientSelect.value);
+  if (!client) {
+    assignmentClientMeta.textContent = "";
+    assignmentEmailsInput.value = "";
+    return;
+  }
+
+  assignmentClientMeta.textContent = `NIT ${client.nit} - Huddle: ${client.huddleName} - Focus: ${client.focusName}`;
+  assignmentEmailsInput.value = (client.assignedTo || []).join(", ");
+}
+
+function renderAssignmentSelector() {
+  const selectedId = assignmentClientSelect.value;
+  assignmentClientSelect.innerHTML = "";
+
+  clients.forEach((client) => {
+    const option = document.createElement("option");
+    option.value = client.id;
+    option.textContent = `${client.name} - NIT ${client.nit}`;
+    assignmentClientSelect.append(option);
+  });
+
+  if (clients.some((client) => client.id === selectedId)) {
+    assignmentClientSelect.value = selectedId;
+  } else if (clients[0]) {
+    assignmentClientSelect.value = clients[0].id;
+  }
+
+  updateAssignmentFields();
+}
+
 function renderAdminPanel() {
   adminPanel.classList.toggle("is-hidden", !isAdmin());
   if (!isAdmin()) return;
 
   webhookUrlInput.value = getEffectiveEmailWebhookUrl();
+  renderAssignmentSelector();
   adminClientsRows.innerHTML = "";
   adminAccessRows.innerHTML = "";
 
@@ -448,14 +640,14 @@ function renderAdminPanel() {
     row.innerHTML = `
       <td>${escapeHtml(client.name)}</td>
       <td>${escapeHtml(client.nit)}</td>
-      <td>${escapeHtml(client.serviceLine)}</td>
+      <td>${escapeHtml(client.huddleName)}</td>
+      <td>${escapeHtml(client.focusName)}</td>
       <td>
         <input class="inline-input" type="text" value="${escapeHtml((client.assignedTo || []).join(", "))}" data-assignments-for="${escapeHtml(client.id)}">
       </td>
       <td>
         <div class="row-actions">
           <button class="secondary small-button" type="button" data-save-assignments="${escapeHtml(client.id)}">Guardar</button>
-          <button class="secondary small-button" type="button" data-remove-client="${escapeHtml(client.id)}">Quitar</button>
         </div>
       </td>
     `;
@@ -497,6 +689,8 @@ function buildAccessRequestPayload(formData) {
     clientId: selectedClient.id,
     clientName: selectedClient.name,
     nit: selectedClient.nit,
+    huddleName: selectedClient.huddleName,
+    focusName: selectedClient.focusName,
     serviceLine: selectedClient.serviceLine,
     manager: selectedClient.manager,
     requesterName: currentUser.name,
@@ -517,6 +711,8 @@ function buildEmailPreview(payload) {
   const body = [
     `Cliente: ${payload.clientName}`,
     `NIT: ${payload.nit}`,
+    `Nombre en Huddle: ${payload.huddleName}`,
+    `Nombre en Focus: ${payload.focusName}`,
     `Solicitante: ${payload.requesterName} (${payload.requesterEmail})`,
     `Usuarios que requieren acceso: ${payload.requestedUserEmails}`,
     `Accesos solicitados: ${payload.accesses}`,
@@ -885,30 +1081,25 @@ function clearWebhookConfig() {
 function handleClientAdminSubmit(event) {
   event.preventDefault();
   const formData = new FormData(clientAdminForm);
+  const client = clients.find((item) => item.id === String(formData.get("clientId")));
   const assignedTo = parseAssignedTo(formData.get("assignedTo"));
 
-  const client = {
-    id: `CLI-${Date.now()}`,
-    name: String(formData.get("name") || "").trim(),
-    nit: String(formData.get("nit") || "").trim(),
-    serviceLine: String(formData.get("serviceLine") || "").trim(),
-    manager: String(formData.get("manager") || "").trim(),
-    assignedTo,
-    confidentialityStatus: "Pendiente"
-  };
-
-  if (!client.name || !client.nit || !client.serviceLine || !client.manager || assignedTo.length === 0) {
-    showToast("Completa todos los campos del cliente.");
+  if (!client) {
+    showToast("Selecciona un cliente.");
     return;
   }
 
-  clients.push(client);
+  if (assignedTo.length > 0 && !assignedTo.every(isBakerEmail)) {
+    showToast(`Agrega correos validos que terminen en ${allowedEmailDomain}.`);
+    return;
+  }
+
+  client.assignedTo = assignedTo;
   saveClients();
-  clientAdminForm.reset();
   renderClients();
   renderAdminPanel();
   renderMetrics();
-  showToast("Cliente agregado.");
+  showToast(assignedTo.length > 0 ? "Correos asignados al cliente." : "Asignaciones del cliente eliminadas.");
 }
 
 function removeClient(clientId) {
@@ -935,8 +1126,8 @@ function saveClientAssignments(clientId, value) {
   if (!client) return;
 
   const assignedTo = parseAssignedTo(value);
-  if (assignedTo.length === 0) {
-    showToast("Agrega al menos un correo asignado.");
+  if (assignedTo.length > 0 && !assignedTo.every(isBakerEmail)) {
+    showToast(`Agrega correos validos que terminen en ${allowedEmailDomain}.`);
     return;
   }
 
@@ -945,7 +1136,7 @@ function saveClientAssignments(clientId, value) {
   renderClients();
   renderAdminPanel();
   renderMetrics();
-  showToast("Asignaciones guardadas.");
+  showToast(assignedTo.length > 0 ? "Asignaciones guardadas." : "Asignaciones eliminadas.");
 }
 
 passwordEmail.value = temporaryLogin.email;
@@ -955,6 +1146,7 @@ logoutButton.addEventListener("click", logout);
 emailConfigForm.addEventListener("submit", handleEmailConfigSubmit);
 clearWebhookButton.addEventListener("click", clearWebhookConfig);
 clientAdminForm.addEventListener("submit", handleClientAdminSubmit);
+assignmentClientSelect.addEventListener("change", updateAssignmentFields);
 searchInput.addEventListener("input", renderClients);
 surveyForm.addEventListener("change", updateSubmitState);
 surveyForm.addEventListener("input", updateSubmitState);
@@ -988,4 +1180,9 @@ adminClientsRows.addEventListener("click", (event) => {
   removeClient(removeButton.dataset.removeClient);
 });
 
-finishOffice365Redirect();
+async function initializeApp() {
+  clients = await loadClients();
+  await finishOffice365Redirect();
+}
+
+initializeApp();

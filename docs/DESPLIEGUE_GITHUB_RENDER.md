@@ -43,7 +43,8 @@ Configurar estas variables de entorno:
 | TEMP_ADMIN_EMAIL | `admin@bakertilly.co` |
 | TEMP_ADMIN_PASSWORD_HASH | Hash SHA-256 de la contrasena temporal del admin |
 | EMAIL_WEBHOOK_URL | URL del flujo de Power Automate que enviara el correo |
-| SHOW_ALL_CLIENTS_WHEN_UNASSIGNED | `true` para demo; `false` cuando exista base real de asignaciones |
+| CLIENTS_CSV_URL | `clientes.csv` |
+| SHOW_ALL_CLIENTS_WHEN_UNASSIGNED | `false` para mostrar solo clientes asignados |
 
 ## Solicitud a TI
 
@@ -110,9 +111,9 @@ Contrasena: Admin2026*
 
 El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o Focus, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
 
-Importante: como Render esta publicando un sitio estatico, esa administracion queda en `localStorage` del navegador. Es util para validar pantallas y flujo, pero no sincroniza datos entre usuarios. Para que el admin gestione informacion real compartida se necesita conectar la app a SharePoint Lists, Dataverse, una API/backend o una base de datos.
+Importante: como Render esta publicando un sitio estatico, el catalogo base de clientes se lee desde `clientes.csv`, pero las asignaciones guardadas desde el panel quedan en `localStorage` del navegador. Es util para validar pantallas y flujo, pero no sincroniza datos entre usuarios. Para que el admin gestione informacion real compartida se necesita conectar la app a SharePoint Lists, Dataverse, una API/backend o una base de datos.
 
-Mientras no exista esa base compartida, `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=true` permite que un usuario autenticado por Office 365 vea clientes aunque no tenga una asignacion exacta. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
+Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve clientes cuando su correo esta asignado por admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 
 ## Envio automatico de correo
 
@@ -145,6 +146,8 @@ accesos@bakertilly.co; seguridad.informacion@bakertilly.co
 <table>
   <tr><td><strong>Cliente</strong></td><td>@{outputs('Compose')?['clientName']}</td></tr>
   <tr><td><strong>NIT</strong></td><td>@{outputs('Compose')?['nit']}</td></tr>
+  <tr><td><strong>Nombre en Huddle</strong></td><td>@{outputs('Compose')?['huddleName']}</td></tr>
+  <tr><td><strong>Nombre en Focus</strong></td><td>@{outputs('Compose')?['focusName']}</td></tr>
   <tr><td><strong>Solicitante</strong></td><td>@{outputs('Compose')?['requesterName']} (@{outputs('Compose')?['requesterEmail']})</td></tr>
   <tr><td><strong>Usuarios que requieren acceso</strong></td><td>@{outputs('Compose')?['requestedUserEmails']}</td></tr>
   <tr><td><strong>Accesos solicitados</strong></td><td>@{outputs('Compose')?['accesses']}</td></tr>
