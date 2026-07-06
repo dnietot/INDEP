@@ -409,6 +409,10 @@ function formatUsersForTextarea(users) {
   return uniqueValues(users).join(", ");
 }
 
+function mergeEmails(currentEmails, newEmails) {
+  return uniqueValues([...(currentEmails || []), ...(newEmails || [])]);
+}
+
 function uniqueValues(values) {
   const list = Array.isArray(values) ? values : [values];
   return [...new Set(list.map(normalizeEmail).filter(Boolean))];
@@ -604,8 +608,9 @@ function updateAssignmentFields() {
     return;
   }
 
-  assignmentClientMeta.textContent = `NIT ${client.nit} - Huddle: ${client.huddleName} - Focus: ${client.focusName}`;
-  assignmentEmailsInput.value = (client.assignedTo || []).join(", ");
+  const assigned = (client.assignedTo || []).join(", ") || "Sin correos asignados";
+  assignmentClientMeta.textContent = `NIT ${client.nit} - Huddle: ${client.huddleName} - Focus: ${client.focusName} - Asignados: ${assigned}`;
+  assignmentEmailsInput.value = "";
 }
 
 function renderAssignmentSelector() {
@@ -1091,17 +1096,26 @@ function handleClientAdminSubmit(event) {
     return;
   }
 
-  if (assignedTo.length > 0 && !assignedTo.every(isBakerEmail)) {
+  if (assignedTo.length === 0) {
+    showToast("Escribe al menos un correo para agregar.");
+    return;
+  }
+
+  if (!assignedTo.every(isBakerEmail)) {
     showToast(`Agrega correos validos que terminen en ${allowedEmailDomain}.`);
     return;
   }
 
-  client.assignedTo = assignedTo;
+  const beforeCount = uniqueValues(client.assignedTo || []).length;
+  client.assignedTo = mergeEmails(client.assignedTo, assignedTo);
+  const addedCount = client.assignedTo.length - beforeCount;
+
   saveClients();
+  assignmentEmailsInput.value = "";
   renderClients();
   renderAdminPanel();
   renderMetrics();
-  showToast(assignedTo.length > 0 ? "Correos asignados al cliente." : "Asignaciones del cliente eliminadas.");
+  showToast(addedCount > 0 ? "Correos agregados al cliente." : "Esos correos ya estaban asignados.");
 }
 
 function removeClient(clientId) {
@@ -1133,12 +1147,17 @@ function saveClientAssignments(clientId, value) {
     return;
   }
 
-  client.assignedTo = assignedTo;
+  const beforeCount = uniqueValues(client.assignedTo || []).length;
+  client.assignedTo = mergeEmails(client.assignedTo, assignedTo);
+  const addedCount = client.assignedTo.length - beforeCount;
+
   saveClients();
   renderClients();
   renderAdminPanel();
   renderMetrics();
-  showToast(assignedTo.length > 0 ? "Asignaciones guardadas." : "Asignaciones eliminadas.");
+  showToast(assignedTo.length === 0
+    ? "No se agregaron correos."
+    : addedCount > 0 ? "Asignaciones agregadas." : "Esos correos ya estaban asignados.");
 }
 
 function escapeCsvValue(value) {

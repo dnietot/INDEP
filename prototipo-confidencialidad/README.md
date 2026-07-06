@@ -66,7 +66,7 @@ El perfil `admin` puede ver todos los clientes, revisar las solicitudes registra
 
 Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate. El cuerpo enviado incluye `requestedUsers` como arreglo y `requestedUserEmails` como texto separado por comas.
 
-Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y la columna opcional `correos asignados`. El panel admin permite descargar un CSV actualizado con las asignaciones guardadas en ese navegador. Para que esas asignaciones sean globales en Render, se debe reemplazar el archivo `clientes.csv` del repositorio y desplegar de nuevo, o conectar una base compartida.
+Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y la columna opcional `correos asignados`. El panel admin agrega correos nuevos sin borrar los ya asignados y permite descargar un CSV actualizado con las asignaciones guardadas en ese navegador. Para que esas asignaciones sean globales en Render, se debe reemplazar el archivo `clientes.csv` del repositorio y desplegar de nuevo, o conectar una base compartida.
 
 Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve los clientes donde su correo este asignado por el admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 
