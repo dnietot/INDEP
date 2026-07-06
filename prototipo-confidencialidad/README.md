@@ -19,11 +19,11 @@ El login puede probarse contra Microsoft Entra ID cuando se configure el Applica
 
 ## Despliegue en Render
 
-Este proyecto incluye `render.yaml` y `build-render-config.js` para desplegarlo como Static Site en Render. En Render configura:
+Este proyecto incluye `render.yaml`, `server.js` y `build-render-config.js` para desplegarlo como servicio Node en Render. En Render configura:
 
 ```text
 Build Command: node build-render-config.js
-Publish Directory: prototipo-confidencialidad
+Start Command: node server.js
 ```
 
 Variables:
@@ -43,6 +43,7 @@ TEMP_ADMIN_EMAIL=admin@bakertilly.co
 TEMP_ADMIN_PASSWORD_HASH=8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec
 EMAIL_WEBHOOK_URL=<URL del flujo de Power Automate>
 CLIENTS_CSV_URL=clientes.csv
+ASSIGNMENTS_API_URL=/api/assignments
 SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false
 ```
 
@@ -66,7 +67,7 @@ El perfil `admin` puede ver todos los clientes, revisar las solicitudes registra
 
 Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate. El cuerpo enviado incluye `requestedUsers` como arreglo y `requestedUserEmails` como texto separado por comas.
 
-Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y la columna opcional `correos asignados`. El panel admin agrega correos nuevos sin borrar los ya asignados y permite descargar un CSV actualizado con las asignaciones guardadas en ese navegador. Para que esas asignaciones sean globales en Render, se debe reemplazar el archivo `clientes.csv` del repositorio y desplegar de nuevo, o conectar una base compartida.
+Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y la columna opcional `correos asignados`. El panel admin agrega correos nuevos sin borrar los ya asignados y los guarda en `/api/assignments` para que los usuarios de Office 365 los vean desde otros navegadores durante la prueba. Para produccion se recomienda conectar SharePoint Lists, Dataverse o una base de datos persistente.
 
 Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve los clientes donde su correo este asignado por el admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 

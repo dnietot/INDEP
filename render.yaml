@@ -1,9 +1,9 @@
 services:
   - type: web
     name: confidencialidad-clientes
-    runtime: static
+    runtime: node
     buildCommand: node build-render-config.js
-    staticPublishPath: prototipo-confidencialidad
+    startCommand: node server.js
     envVars:
       - key: ENTRA_TENANT
         value: 100c493f-7265-4dd6-9a05-63e1a210e604
@@ -15,6 +15,8 @@ services:
         sync: false
       - key: CLIENTS_CSV_URL
         value: clientes.csv
+      - key: ASSIGNMENTS_API_URL
+        value: /api/assignments
       - key: SHOW_ALL_CLIENTS_WHEN_UNASSIGNED
         value: "false"
       - key: TEMP_ADMIN_ENABLED

@@ -30,6 +30,7 @@ const config = {
   temporaryAdminPasswordHash: process.env.TEMP_ADMIN_PASSWORD_HASH || "8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec",
   emailWebhookUrl: process.env.EMAIL_WEBHOOK_URL || "",
   clientsCsvUrl: process.env.CLIENTS_CSV_URL || "clientes.csv",
+  assignmentsApiUrl: process.env.ASSIGNMENTS_API_URL || "/api/assignments",
   showAllClientsWhenUnassigned: process.env.SHOW_ALL_CLIENTS_WHEN_UNASSIGNED === "true"
 };
 

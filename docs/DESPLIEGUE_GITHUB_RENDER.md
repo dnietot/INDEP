@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Publicar el prototipo como sitio estatico para obtener una URL HTTPS estable de Render. Esa URL se entrega a TI para registrarla como redirect URI en Microsoft Entra ID.
+Publicar el prototipo como servicio Node para obtener una URL HTTPS estable de Render y habilitar la API de asignaciones. Esa URL se entrega a TI para registrarla como redirect URI en Microsoft Entra ID.
 
 ## Preparar GitHub
 
@@ -13,16 +13,16 @@ Publicar el prototipo como sitio estatico para obtener una URL HTTPS estable de 
 ## Crear sitio en Render
 
 1. Entrar a Render.
-2. Seleccionar New > Static Site.
+2. Seleccionar New > Web Service.
 3. Conectar el repositorio de GitHub.
 4. Usar estos valores:
 
 | Campo | Valor |
 | --- | --- |
 | Build Command | `node build-render-config.js` |
-| Publish Directory | `prototipo-confidencialidad` |
+| Start Command | `node server.js` |
 
-Tambien se puede usar Blueprint con el archivo `render.yaml` incluido en la raiz del repositorio. En ese caso Render detecta el sitio estatico como `type: web` y `runtime: static`.
+Tambien se puede usar Blueprint con el archivo `render.yaml` incluido en la raiz del repositorio. En ese caso Render detecta el servicio como `type: web` y `runtime: node`.
 
 ## Variables en Render
 
@@ -44,6 +44,7 @@ Configurar estas variables de entorno:
 | TEMP_ADMIN_PASSWORD_HASH | Hash SHA-256 de la contrasena temporal del admin |
 | EMAIL_WEBHOOK_URL | URL del flujo de Power Automate que enviara el correo |
 | CLIENTS_CSV_URL | `clientes.csv` |
+| ASSIGNMENTS_API_URL | `/api/assignments` |
 | SHOW_ALL_CLIENTS_WHEN_UNASSIGNED | `false` para mostrar solo clientes asignados |
 
 ## Solicitud a TI
@@ -98,7 +99,7 @@ TEMP_LOGIN_PASSWORD_HASH=8ff2593d80ac7ff8a06a33e35c9ee1ee9d72fb8fd9e9d7c9b57b36d
 
 La contrasena inicial correspondiente a ese hash es `Indep2026*`.
 
-Este control vive en el navegador porque el sitio es estatico. Sirve para una demo visual, pero no debe usarse para datos reales o confidenciales.
+Este control sigue siendo temporal para demo. Sirve para validar la experiencia, pero no debe usarse para datos reales o confidenciales sin una autenticacion y almacenamiento productivos.
 
 ## Perfil admin temporal
 
@@ -111,7 +112,9 @@ Contrasena: Admin2026*
 
 El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o Focus, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
 
-Importante: como Render esta publicando un sitio estatico, el catalogo base de clientes se lee desde `clientes.csv`. El archivo soporta las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y `correos asignados`. El panel admin puede descargar un CSV actualizado, pero para que esas asignaciones sean globales se debe reemplazar `clientes.csv` en el repositorio y desplegar de nuevo, o conectar la app a SharePoint Lists, Dataverse, una API/backend o una base de datos.
+Importante: Render publica ahora un servicio Node que sirve la app y expone `/api/assignments`. El catalogo base de clientes se lee desde `clientes.csv`; el archivo soporta las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y `correos asignados`. Las asignaciones hechas desde el panel admin se guardan globalmente en la API para la prueba, de modo que otros usuarios de Office 365 puedan ver sus clientes asignados.
+
+Para produccion, mover esas asignaciones a SharePoint Lists, Dataverse o una base de datos persistente. El almacenamiento local del servicio sirve para validacion, pero puede perderse si Render recrea la instancia.
 
 Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve clientes cuando su correo esta asignado por admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 

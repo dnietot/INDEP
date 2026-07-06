@@ -28,6 +28,7 @@ const allowedEmailDomain = window.CONFIDENCIALIDAD_CONFIG?.allowedEmailDomain ||
 const graphMeEndpoint = "https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName,otherMails";
 const emailWebhookUrl = window.CONFIDENCIALIDAD_CONFIG?.emailWebhookUrl || "";
 const clientsCsvUrl = window.CONFIDENCIALIDAD_CONFIG?.clientsCsvUrl || "clientes.csv";
+const assignmentsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.assignmentsApiUrl || "/api/assignments";
 const showAllClientsWhenUnassigned = window.CONFIDENCIALIDAD_CONFIG?.showAllClientsWhenUnassigned === true;
 const temporaryLogin = {
   enabled: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEnabled !== false,
@@ -104,6 +105,7 @@ let selectedClient = null;
 let accessRecords = loadAccessRecords();
 let history = buildHistoryFromAccessRecords();
 let msalClient = null;
+let remoteAssignmentsEnabled = false;
 
 const authScreen = document.querySelector("#authScreen");
 const appShell = document.querySelector("#appShell");
@@ -252,7 +254,7 @@ function loadLegacyClients() {
   }
 }
 
-function loadClientAssignments() {
+function loadLocalClientAssignments() {
   try {
     const saved = localStorage.getItem(clientAssignmentsStorageKey);
     return saved ? JSON.parse(saved) : {};
@@ -261,14 +263,35 @@ function loadClientAssignments() {
   }
 }
 
+async function loadRemoteClientAssignments() {
+  try {
+    const response = await fetch(assignmentsApiUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Assignments returned ${response.status}`);
+    }
+
+    const payload = await response.json();
+    remoteAssignmentsEnabled = true;
+    return payload.assignments || {};
+  } catch (error) {
+    remoteAssignmentsEnabled = false;
+    return null;
+  }
+}
+
+async function loadClientAssignments() {
+  const remoteAssignments = await loadRemoteClientAssignments();
+  return remoteAssignments || loadLocalClientAssignments();
+}
+
 function findLegacyClient(client, legacyClients) {
   return legacyClients.find((legacy) => {
     return legacy.id === client.id || legacy.nit === client.nit || normalizeEmail(legacy.name) === normalizeEmail(client.name);
   });
 }
 
-function applySavedClientState(baseClients) {
-  const assignments = loadClientAssignments();
+async function applySavedClientState(baseClients) {
+  const assignments = await loadClientAssignments();
   const legacyClients = loadLegacyClients();
 
   return baseClients.map((client) => {
@@ -291,21 +314,51 @@ async function loadClients() {
     }
 
     const csvClients = clientsFromCsv(await response.text());
-    return applySavedClientState(csvClients.length > 0 ? csvClients : cloneDefaultClients());
+    return await applySavedClientState(csvClients.length > 0 ? csvClients : cloneDefaultClients());
   } catch (error) {
-    return applySavedClientState(cloneDefaultClients());
+    return await applySavedClientState(cloneDefaultClients());
   }
 }
 
-function saveClients() {
-  const assignments = clients.reduce((accumulator, client) => {
+function buildClientAssignments() {
+  return clients.reduce((accumulator, client) => {
     accumulator[client.id] = uniqueValues(client.assignedTo || []);
     accumulator[client.nit] = uniqueValues(client.assignedTo || []);
     return accumulator;
   }, {});
+}
+
+async function saveRemoteClientAssignments(assignments) {
+  if (!remoteAssignmentsEnabled) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(assignmentsApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ assignments })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Assignments save returned ${response.status}`);
+    }
+
+    return true;
+  } catch (error) {
+    remoteAssignmentsEnabled = false;
+    return false;
+  }
+}
+
+async function saveClients() {
+  const assignments = buildClientAssignments();
 
   localStorage.setItem(clientAssignmentsStorageKey, JSON.stringify(assignments));
   localStorage.setItem(clientsStorageKey, JSON.stringify(clients));
+  return await saveRemoteClientAssignments(assignments);
 }
 
 function loadAccessRecords() {
@@ -1085,7 +1138,7 @@ function clearWebhookConfig() {
   renderAdminPanel();
 }
 
-function handleClientAdminSubmit(event) {
+async function handleClientAdminSubmit(event) {
   event.preventDefault();
   const formData = new FormData(clientAdminForm);
   const client = clients.find((item) => item.id === String(formData.get("clientId")));
@@ -1110,18 +1163,20 @@ function handleClientAdminSubmit(event) {
   client.assignedTo = mergeEmails(client.assignedTo, assignedTo);
   const addedCount = client.assignedTo.length - beforeCount;
 
-  saveClients();
+  const savedRemote = await saveClients();
   assignmentEmailsInput.value = "";
   renderClients();
   renderAdminPanel();
   renderMetrics();
-  showToast(addedCount > 0 ? "Correos agregados al cliente." : "Esos correos ya estaban asignados.");
+  showToast(addedCount > 0
+    ? savedRemote ? "Correos agregados y guardados globalmente." : "Correos agregados en este navegador. La API global no respondio."
+    : "Esos correos ya estaban asignados.");
 }
 
-function removeClient(clientId) {
+async function removeClient(clientId) {
   clients = clients.filter((client) => client.id !== clientId);
   accessRecords = accessRecords.filter((record) => record.clientId !== clientId);
-  saveClients();
+  await saveClients();
   saveAccessRecords();
 
   if (selectedClient?.id === clientId) {
@@ -1137,7 +1192,7 @@ function removeClient(clientId) {
   showToast("Cliente eliminado.");
 }
 
-function saveClientAssignments(clientId, value) {
+async function saveClientAssignments(clientId, value) {
   const client = clients.find((item) => item.id === clientId);
   if (!client) return;
 
@@ -1151,13 +1206,15 @@ function saveClientAssignments(clientId, value) {
   client.assignedTo = mergeEmails(client.assignedTo, assignedTo);
   const addedCount = client.assignedTo.length - beforeCount;
 
-  saveClients();
+  const savedRemote = await saveClients();
   renderClients();
   renderAdminPanel();
   renderMetrics();
   showToast(assignedTo.length === 0
     ? "No se agregaron correos."
-    : addedCount > 0 ? "Asignaciones agregadas." : "Esos correos ya estaban asignados.");
+    : addedCount > 0
+      ? savedRemote ? "Asignaciones agregadas y guardadas globalmente." : "Asignaciones agregadas en este navegador. La API global no respondio."
+      : "Esos correos ya estaban asignados.");
 }
 
 function escapeCsvValue(value) {
