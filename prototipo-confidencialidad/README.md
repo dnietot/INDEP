@@ -44,6 +44,7 @@ TEMP_ADMIN_PASSWORD_HASH=8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af
 EMAIL_WEBHOOK_URL=<URL del flujo de Power Automate>
 CLIENTS_CSV_URL=clientes.csv
 ASSIGNMENTS_API_URL=/api/assignments
+ACCESS_RECORDS_API_URL=/api/access-records
 SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false
 ```
 
@@ -67,7 +68,7 @@ El perfil `admin` puede ver todos los clientes, revisar las solicitudes registra
 
 Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate. El cuerpo enviado incluye `requestedUsers` como arreglo y `requestedUserEmails` como texto separado por comas.
 
-Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y la columna opcional `correos asignados`. El panel admin agrega correos nuevos sin borrar los ya asignados y los guarda en `/api/assignments` para que los usuarios de Office 365 los vean desde otros navegadores durante la prueba. Para produccion se recomienda conectar SharePoint Lists, Dataverse o una base de datos persistente.
+Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y la columna opcional `correos asignados`. El panel admin agrega correos nuevos sin borrar los ya asignados y los guarda en `/api/assignments`. Las solicitudes se guardan en `/api/access-records`, para que aparezcan en el panel admin aunque las haya enviado otro usuario. Para produccion se recomienda conectar SharePoint Lists, Dataverse o una base de datos persistente.
 
 Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve los clientes donde su correo este asignado por el admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 

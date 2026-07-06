@@ -7,6 +7,7 @@ const { URL } = require("url");
 const port = Number(process.env.PORT || 8766);
 const publicDir = path.join(__dirname, "prototipo-confidencialidad");
 const assignmentsPath = process.env.ASSIGNMENTS_FILE || path.join(os.tmpdir(), "confidencialidad-assignments.json");
+const accessRecordsPath = process.env.ACCESS_RECORDS_FILE || path.join(os.tmpdir(), "confidencialidad-access-records.json");
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -73,6 +74,78 @@ function writeAssignments(assignments) {
   fs.writeFileSync(assignmentsPath, JSON.stringify(normalizeAssignments(assignments), null, 2), "utf8");
 }
 
+function normalizeAccessRecord(record) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) {
+    return null;
+  }
+
+  return {
+    requestId: String(record.requestId || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    submittedAt: String(record.submittedAt || new Date().toISOString()),
+    clientId: String(record.clientId || ""),
+    clientName: String(record.clientName || ""),
+    nit: String(record.nit || ""),
+    huddleName: String(record.huddleName || ""),
+    focusName: String(record.focusName || ""),
+    serviceLine: String(record.serviceLine || ""),
+    manager: String(record.manager || ""),
+    requesterName: String(record.requesterName || ""),
+    requesterEmail: normalizeEmail(record.requesterEmail),
+    requestedUsers: Array.isArray(record.requestedUsers)
+      ? [...new Set(record.requestedUsers.map(normalizeEmail).filter(Boolean))]
+      : [],
+    requestedUserEmails: String(record.requestedUserEmails || ""),
+    accesses: String(record.accesses || ""),
+    expiresAt: String(record.expiresAt || ""),
+    workToDevelop: String(record.workToDevelop || ""),
+    noConflictOfInterest: Boolean(record.noConflictOfInterest),
+    authorizedUseConfirmation: Boolean(record.authorizedUseConfirmation),
+    recipients: Array.isArray(record.recipients)
+      ? record.recipients.map(normalizeEmail).filter(Boolean)
+      : []
+  };
+}
+
+function normalizeAccessRecords(records) {
+  if (!Array.isArray(records)) {
+    return [];
+  }
+
+  return records
+    .map(normalizeAccessRecord)
+    .filter(Boolean)
+    .slice(0, 1000);
+}
+
+function readAccessRecords() {
+  try {
+    return normalizeAccessRecords(JSON.parse(fs.readFileSync(accessRecordsPath, "utf8")));
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeAccessRecords(records) {
+  fs.mkdirSync(path.dirname(accessRecordsPath), { recursive: true });
+  fs.writeFileSync(accessRecordsPath, JSON.stringify(normalizeAccessRecords(records), null, 2), "utf8");
+}
+
+function appendAccessRecord(record) {
+  const normalizedRecord = normalizeAccessRecord(record);
+  if (!normalizedRecord) {
+    return null;
+  }
+
+  const records = readAccessRecords();
+  const mergedRecords = [
+    normalizedRecord,
+    ...records.filter((existingRecord) => existingRecord.requestId !== normalizedRecord.requestId)
+  ].slice(0, 1000);
+
+  writeAccessRecords(mergedRecords);
+  return { record: normalizedRecord, records: mergedRecords };
+}
+
 async function handleAssignments(request, response) {
   if (request.method === "GET") {
     sendJson(response, 200, { assignments: readAssignments() });
@@ -87,6 +160,42 @@ async function handleAssignments(request, response) {
       sendJson(response, 200, { ok: true, assignments });
     } catch (error) {
       sendJson(response, 400, { ok: false, error: "Invalid assignments payload" });
+    }
+    return;
+  }
+
+  sendJson(response, 405, { ok: false, error: "Method not allowed" });
+}
+
+async function handleAccessRecords(request, response) {
+  if (request.method === "GET") {
+    sendJson(response, 200, { records: readAccessRecords() });
+    return;
+  }
+
+  if (request.method === "POST") {
+    try {
+      const body = JSON.parse(await readBody(request) || "{}");
+
+      if (body.record) {
+        const result = appendAccessRecord(body.record);
+        if (!result) {
+          throw new Error("Invalid access record");
+        }
+
+        sendJson(response, 200, { ok: true, ...result });
+        return;
+      }
+
+      if (!Array.isArray(body.records)) {
+        throw new Error("Invalid access records list");
+      }
+
+      const records = normalizeAccessRecords(body.records);
+      writeAccessRecords(records);
+      sendJson(response, 200, { ok: true, records });
+    } catch (error) {
+      sendJson(response, 400, { ok: false, error: "Invalid access records payload" });
     }
     return;
   }
@@ -127,6 +236,11 @@ const server = http.createServer(async (request, response) => {
 
   if (url.pathname === "/api/assignments") {
     await handleAssignments(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/access-records") {
+    await handleAccessRecords(request, response);
     return;
   }
 

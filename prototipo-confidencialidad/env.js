@@ -14,5 +14,6 @@ window.CONFIDENCIALIDAD_CONFIG = {
   "emailWebhookUrl": "",
   "clientsCsvUrl": "clientes.csv",
   "assignmentsApiUrl": "/api/assignments",
+  "accessRecordsApiUrl": "/api/access-records",
   "showAllClientsWhenUnassigned": false
 };

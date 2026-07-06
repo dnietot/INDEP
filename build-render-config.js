@@ -31,6 +31,7 @@ const config = {
   emailWebhookUrl: process.env.EMAIL_WEBHOOK_URL || "",
   clientsCsvUrl: process.env.CLIENTS_CSV_URL || "clientes.csv",
   assignmentsApiUrl: process.env.ASSIGNMENTS_API_URL || "/api/assignments",
+  accessRecordsApiUrl: process.env.ACCESS_RECORDS_API_URL || "/api/access-records",
   showAllClientsWhenUnassigned: process.env.SHOW_ALL_CLIENTS_WHEN_UNASSIGNED === "true"
 };
 

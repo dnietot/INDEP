@@ -45,6 +45,7 @@ Configurar estas variables de entorno:
 | EMAIL_WEBHOOK_URL | URL del flujo de Power Automate que enviara el correo |
 | CLIENTS_CSV_URL | `clientes.csv` |
 | ASSIGNMENTS_API_URL | `/api/assignments` |
+| ACCESS_RECORDS_API_URL | `/api/access-records` |
 | SHOW_ALL_CLIENTS_WHEN_UNASSIGNED | `false` para mostrar solo clientes asignados |
 
 ## Solicitud a TI
@@ -112,7 +113,7 @@ Contrasena: Admin2026*
 
 El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o Focus, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
 
-Importante: Render publica ahora un servicio Node que sirve la app y expone `/api/assignments`. El catalogo base de clientes se lee desde `clientes.csv`; el archivo soporta las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y `correos asignados`. Las asignaciones hechas desde el panel admin se guardan globalmente en la API para la prueba, de modo que otros usuarios de Office 365 puedan ver sus clientes asignados.
+Importante: Render publica ahora un servicio Node que sirve la app y expone `/api/assignments` y `/api/access-records`. El catalogo base de clientes se lee desde `clientes.csv`; el archivo soporta las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y `correos asignados`. Las asignaciones hechas desde el panel admin se guardan globalmente en la API para la prueba, de modo que otros usuarios de Office 365 puedan ver sus clientes asignados. Las solicitudes enviadas por usuarios se guardan en `/api/access-records` para que aparezcan en el panel admin.
 
 Para produccion, mover esas asignaciones a SharePoint Lists, Dataverse o una base de datos persistente. El almacenamiento local del servicio sirve para validacion, pero puede perderse si Render recrea la instancia.
 

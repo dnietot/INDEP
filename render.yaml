@@ -17,6 +17,8 @@ services:
         value: clientes.csv
       - key: ASSIGNMENTS_API_URL
         value: /api/assignments
+      - key: ACCESS_RECORDS_API_URL
+        value: /api/access-records
       - key: SHOW_ALL_CLIENTS_WHEN_UNASSIGNED
         value: "false"
       - key: TEMP_ADMIN_ENABLED

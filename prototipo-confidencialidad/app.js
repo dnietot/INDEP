@@ -29,6 +29,7 @@ const graphMeEndpoint = "https://graph.microsoft.com/v1.0/me?$select=displayName
 const emailWebhookUrl = window.CONFIDENCIALIDAD_CONFIG?.emailWebhookUrl || "";
 const clientsCsvUrl = window.CONFIDENCIALIDAD_CONFIG?.clientsCsvUrl || "clientes.csv";
 const assignmentsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.assignmentsApiUrl || "/api/assignments";
+const accessRecordsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.accessRecordsApiUrl || "/api/access-records";
 const showAllClientsWhenUnassigned = window.CONFIDENCIALIDAD_CONFIG?.showAllClientsWhenUnassigned === true;
 const temporaryLogin = {
   enabled: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEnabled !== false,
@@ -102,10 +103,12 @@ const defaultClients = [
 
 let clients = cloneDefaultClients();
 let selectedClient = null;
-let accessRecords = loadAccessRecords();
+let accessRecords = loadLocalAccessRecords();
 let history = buildHistoryFromAccessRecords();
 let msalClient = null;
 let remoteAssignmentsEnabled = false;
+let remoteAccessRecordsEnabled = false;
+let accessRecordsRefreshTimer = null;
 
 const authScreen = document.querySelector("#authScreen");
 const appShell = document.querySelector("#appShell");
@@ -361,7 +364,7 @@ async function saveClients() {
   return await saveRemoteClientAssignments(assignments);
 }
 
-function loadAccessRecords() {
+function loadLocalAccessRecords() {
   try {
     const saved = localStorage.getItem(accessRecordsStorageKey);
     return saved ? JSON.parse(saved) : [];
@@ -370,8 +373,124 @@ function loadAccessRecords() {
   }
 }
 
-function saveAccessRecords() {
+async function loadRemoteAccessRecords() {
+  try {
+    const response = await fetch(accessRecordsApiUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Access records returned ${response.status}`);
+    }
+
+    const payload = await response.json();
+    remoteAccessRecordsEnabled = true;
+    return Array.isArray(payload.records) ? payload.records : [];
+  } catch (error) {
+    remoteAccessRecordsEnabled = false;
+    return null;
+  }
+}
+
+async function loadAccessRecords() {
+  const remoteRecords = await loadRemoteAccessRecords();
+  return remoteRecords || loadLocalAccessRecords();
+}
+
+async function saveRemoteAccessRecords(records) {
+  if (!remoteAccessRecordsEnabled) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(accessRecordsApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ records })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Access records save returned ${response.status}`);
+    }
+
+    return true;
+  } catch (error) {
+    remoteAccessRecordsEnabled = false;
+    return false;
+  }
+}
+
+async function appendRemoteAccessRecord(record) {
+  if (!remoteAccessRecordsEnabled) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(accessRecordsApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ record })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Access record append returned ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const savedRecord = payload.record || record;
+
+    accessRecords = Array.isArray(payload.records)
+      ? payload.records
+      : [savedRecord, ...accessRecords.filter((existingRecord) => existingRecord.requestId !== savedRecord.requestId)];
+    localStorage.setItem(accessRecordsStorageKey, JSON.stringify(accessRecords));
+    return true;
+  } catch (error) {
+    remoteAccessRecordsEnabled = false;
+    return false;
+  }
+}
+
+async function saveAccessRecords() {
   localStorage.setItem(accessRecordsStorageKey, JSON.stringify(accessRecords));
+  return await saveRemoteAccessRecords(accessRecords);
+}
+
+async function addAccessRecord(record) {
+  const savedRemoteRecord = await appendRemoteAccessRecord(record);
+  if (savedRemoteRecord) {
+    return true;
+  }
+
+  accessRecords.unshift(record);
+  localStorage.setItem(accessRecordsStorageKey, JSON.stringify(accessRecords));
+  return false;
+}
+
+async function refreshAccessRecordsFromRemote() {
+  if (!isAdmin()) return;
+
+  const remoteRecords = await loadRemoteAccessRecords();
+  if (!remoteRecords) return;
+
+  accessRecords = remoteRecords;
+  localStorage.setItem(accessRecordsStorageKey, JSON.stringify(accessRecords));
+  renderHistory();
+  renderMetrics();
+  renderAdminPanel();
+}
+
+function startAccessRecordsRefresh() {
+  window.clearInterval(accessRecordsRefreshTimer);
+  if (!isAdmin()) return;
+
+  refreshAccessRecordsFromRemote();
+  accessRecordsRefreshTimer = window.setInterval(refreshAccessRecordsFromRemote, 30000);
+}
+
+function stopAccessRecordsRefresh() {
+  window.clearInterval(accessRecordsRefreshTimer);
+  accessRecordsRefreshTimer = null;
 }
 
 function buildHistoryFromAccessRecords() {
@@ -827,8 +946,7 @@ async function submitSurvey(event) {
 
   const payload = buildAccessRequestPayload(formData);
   const now = new Date();
-  accessRecords.unshift(payload);
-  saveAccessRecords();
+  const savedRemoteRecord = await addAccessRecord(payload);
 
   history.unshift({
     date: now.toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
@@ -849,7 +967,9 @@ async function submitSurvey(event) {
     const sentToWebhook = await sendEmailWebhook(payload);
     showToast(sentToWebhook
       ? "Solicitud registrada y enviada al flujo de correo."
-      : "Solicitud registrada. Falta configurar EMAIL_WEBHOOK_URL para enviar el correo.");
+      : savedRemoteRecord
+        ? "Solicitud registrada en el panel admin. Falta configurar EMAIL_WEBHOOK_URL para enviar el correo."
+        : "Solicitud registrada en este navegador. La API del panel admin no respondio.");
   } catch (error) {
     showToast("Solicitud registrada, pero no se pudo llamar el flujo de correo.");
   }
@@ -993,6 +1113,7 @@ function startSession() {
   renderHistory();
   renderAdminPanel();
   renderMetrics();
+  startAccessRecordsRefresh();
 }
 
 function getUserEmailFromGraph(profile, account) {
@@ -1102,6 +1223,7 @@ async function logout() {
   history = [];
   surveyForm.reset();
   forgetTemporarySession();
+  stopAccessRecordsRefresh();
 
   if (client && activeAccount) {
     await client.logoutRedirect({
@@ -1177,7 +1299,7 @@ async function removeClient(clientId) {
   clients = clients.filter((client) => client.id !== clientId);
   accessRecords = accessRecords.filter((record) => record.clientId !== clientId);
   await saveClients();
-  saveAccessRecords();
+  await saveAccessRecords();
 
   if (selectedClient?.id === clientId) {
     selectedClient = null;
@@ -1295,6 +1417,8 @@ adminClientsRows.addEventListener("click", (event) => {
 
 async function initializeApp() {
   clients = await loadClients();
+  accessRecords = await loadAccessRecords();
+  history = buildHistoryFromAccessRecords();
   await finishOffice365Redirect();
 }
 
