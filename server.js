@@ -53,17 +53,21 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeEmailList(value) {
+  const list = Array.isArray(value)
+    ? value
+    : String(value || "").split(/[,\n;]/);
+
+  return [...new Set(list.map(normalizeEmail).filter(Boolean))];
+}
+
 function normalizeAssignments(assignments) {
   if (!assignments || typeof assignments !== "object" || Array.isArray(assignments)) {
     return {};
   }
 
   return Object.entries(assignments).reduce((accumulator, [key, value]) => {
-    const emails = Array.isArray(value)
-      ? value.map(normalizeEmail).filter(Boolean)
-      : [];
-
-    accumulator[String(key)] = [...new Set(emails)];
+    accumulator[String(key)] = normalizeEmailList(value);
     return accumulator;
   }, {});
 }
@@ -99,6 +103,11 @@ function normalizeAccessRecord(record) {
     ? [...new Set(record.requestedUsers.map(normalizeEmail).filter(Boolean))]
     : [];
   const requestedUserEmails = String(record.requestedUserEmails || requestedUsers.join(", ") || requesterEmail);
+  const partnerEmail = normalizeEmail(record.partnerEmail || record.socioEmail);
+  const partnerEmails = normalizeEmailList([
+    partnerEmail,
+    ...normalizeEmailList(record.partnerEmails || record.socioEmails)
+  ]);
 
   return {
     requestId: String(record.requestId || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
@@ -114,7 +123,8 @@ function normalizeAccessRecord(record) {
     requesterEmail,
     senderEmail: normalizeEmail(record.senderEmail),
     partnerName: String(record.partnerName || record.socio || ""),
-    partnerEmail: normalizeEmail(record.partnerEmail || record.socioEmail),
+    partnerEmail: partnerEmails[0] || partnerEmail,
+    partnerEmails,
     approvalStatus: getApprovalStatus(record),
     approvalToken: String(record.approvalToken || generateApprovalToken()),
     approvalRequestedAt: String(record.approvalRequestedAt || ""),
@@ -333,13 +343,6 @@ async function sendSmtpMail({ to, subject, text, html }) {
   }).catch((error) => ({ ok: false, error: error.message }));
 }
 
-function approvalLink(record) {
-  const url = new URL("/api/access-records/approve", appBaseUrl);
-  url.searchParams.set("requestId", record.requestId);
-  url.searchParams.set("token", record.approvalToken);
-  return url.toString();
-}
-
 function requestSummaryHtml(record) {
   return `
     <table>
@@ -351,13 +354,15 @@ function requestSummaryHtml(record) {
       <tr><td><strong>Accesos solicitados</strong></td><td>${escapeHtml(record.accesses)}</td></tr>
       <tr><td><strong>Vigencia maxima</strong></td><td>${escapeHtml(record.expiresAt)}</td></tr>
       <tr><td><strong>Trabajo a desarrollar</strong></td><td>${escapeHtml(record.workToDevelop)}</td></tr>
-      <tr><td><strong>Socio</strong></td><td>${escapeHtml(record.partnerName)} (${escapeHtml(record.partnerEmail)})</td></tr>
+      <tr><td><strong>Socio</strong></td><td>${escapeHtml(record.partnerName)} (${escapeHtml((record.partnerEmails || [record.partnerEmail]).filter(Boolean).join(", "))})</td></tr>
     </table>
   `;
 }
 
 async function sendPartnerApprovalRequest(record) {
-  if (!record.partnerEmail) {
+  const partnerRecipients = record.partnerEmails?.length ? record.partnerEmails : [record.partnerEmail].filter(Boolean);
+
+  if (partnerRecipients.length === 0) {
     return updateAccessRecord(record.requestId, (current) => ({
       ...current,
       approvalStatus: "pending_partner",
@@ -365,15 +370,14 @@ async function sendPartnerApprovalRequest(record) {
     }));
   }
 
-  const link = approvalLink(record);
   const result = await sendSmtpMail({
-    to: record.partnerEmail,
+    to: partnerRecipients,
     subject: `[Confidencialidad] Aprobacion requerida - ${record.clientName}`,
-    text: `Se registro una solicitud de acceso para ${record.clientName}. Aprueba aqui: ${link}`,
+    text: `Se registro una solicitud de acceso para ${record.clientName}. Ingresa a ${appBaseUrl} con tu correo para aprobarla.`,
     html: `
       <p>Se registro una solicitud de acceso que requiere aprobacion del socio.</p>
       ${requestSummaryHtml(record)}
-      <p><a href="${escapeHtml(link)}">Aprobar solicitud</a></p>
+      <p>Ingresa a <a href="${escapeHtml(appBaseUrl)}">${escapeHtml(appBaseUrl)}</a> con tu correo para aprobarla desde tu perfil.</p>
     `
   });
 
@@ -390,7 +394,7 @@ async function sendAccessRequestToTeam(record) {
   return await sendSmtpMail({
     to: recipients,
     subject: `[Confidencialidad] Solicitud aprobada - ${record.clientName} - ${record.requesterEmail}`,
-    text: `Solicitud aprobada para ${record.clientName} por ${record.partnerEmail || record.approvedBy}.`,
+    text: `Solicitud aprobada para ${record.clientName} por ${record.approvedBy || record.partnerEmail}.`,
     html: `
       <p>El socio aprobo la siguiente solicitud de acceso.</p>
       ${requestSummaryHtml(record)}
@@ -398,6 +402,46 @@ async function sendAccessRequestToTeam(record) {
       <p><strong>Fecha de aprobacion:</strong> ${escapeHtml(record.approvedAt)}</p>
     `
   });
+}
+
+function canApproveRecord(record, approverEmail) {
+  const approver = normalizeEmail(approverEmail);
+  const partnerEmails = record.partnerEmails?.length ? record.partnerEmails : [record.partnerEmail].filter(Boolean);
+  return Boolean(approver && partnerEmails.includes(approver));
+}
+
+async function approveAccessRecord(record, approvedBy) {
+  if (record.accessEmailSentAt) {
+    return { ok: true, alreadyApproved: true, record, records: readAccessRecords(), emailResult: { ok: true } };
+  }
+
+  const approvedAt = new Date().toISOString();
+  const approved = updateAccessRecord(record.requestId, (current) => ({
+    ...current,
+    approvalStatus: "approved",
+    approvedAt,
+    approvedBy: normalizeEmail(approvedBy)
+  }));
+
+  if (!approved) {
+    return { ok: false, error: "Record not found" };
+  }
+
+  const emailResult = await sendAccessRequestToTeam(approved.record);
+  const finalStatus = emailResult.ok ? "sent_to_access_team" : "approved_pending_email";
+  const finalResult = updateAccessRecord(record.requestId, (current) => ({
+    ...current,
+    approvalStatus: finalStatus,
+    accessEmailSentAt: emailResult.ok ? new Date().toISOString() : current.accessEmailSentAt,
+    mailError: emailResult.ok ? "" : emailResult.error
+  }));
+
+  return {
+    ok: true,
+    record: finalResult.record,
+    records: finalResult.records,
+    emailResult
+  };
 }
 
 async function handleAssignments(request, response) {
@@ -482,56 +526,40 @@ function sendHtml(response, statusCode, body) {
 }
 
 async function handleAccessApproval(request, response, url) {
+  if (request.method === "POST") {
+    try {
+      const body = JSON.parse(await readBody(request) || "{}");
+      const requestId = String(body.requestId || "");
+      const approverEmail = normalizeEmail(body.approverEmail);
+      const record = readAccessRecords().find((item) => item.requestId === requestId);
+
+      if (!record) {
+        sendJson(response, 404, { ok: false, error: "Solicitud no encontrada" });
+        return;
+      }
+
+      if (!canApproveRecord(record, approverEmail)) {
+        sendJson(response, 403, { ok: false, error: "El correo autenticado no corresponde al socio asignado" });
+        return;
+      }
+
+      const result = await approveAccessRecord(record, approverEmail);
+      sendJson(response, result.ok ? 200 : 400, result);
+    } catch (error) {
+      sendJson(response, 400, { ok: false, error: "Invalid approval payload" });
+    }
+    return;
+  }
+
   if (request.method !== "GET") {
     sendJson(response, 405, { ok: false, error: "Method not allowed" });
     return;
   }
 
-  const requestId = url.searchParams.get("requestId") || "";
-  const token = url.searchParams.get("token") || "";
-  const record = readAccessRecords().find((item) => item.requestId === requestId);
-
-  if (!record || !token || record.approvalToken !== token) {
-    sendHtml(response, 403, `
-      <h1>No se pudo aprobar la solicitud</h1>
-      <p>El enlace no es valido o la solicitud ya no existe.</p>
-    `);
-    return;
-  }
-
-  if (record.accessEmailSentAt) {
-    sendHtml(response, 200, `
-      <h1>Solicitud ya aprobada</h1>
-      <p>La solicitud para <strong>${escapeHtml(record.clientName)}</strong> ya fue aprobada y enviada al equipo de accesos.</p>
-      <p class="muted">No necesitas hacer nada mas.</p>
-    `);
-    return;
-  }
-
-  const approvedAt = new Date().toISOString();
-  const approved = updateAccessRecord(record.requestId, (current) => ({
-    ...current,
-    approvalStatus: "approved",
-    approvedAt,
-    approvedBy: current.partnerEmail
-  }));
-
-  const emailResult = approved ? await sendAccessRequestToTeam(approved.record) : { ok: false, error: "Record not found" };
-  const finalStatus = emailResult.ok ? "sent_to_access_team" : "approved_pending_email";
-  const finalRecord = updateAccessRecord(record.requestId, (current) => ({
-    ...current,
-    approvalStatus: finalStatus,
-    accessEmailSentAt: emailResult.ok ? new Date().toISOString() : current.accessEmailSentAt,
-    mailError: emailResult.ok ? "" : emailResult.error
-  }))?.record;
-
   sendHtml(response, 200, `
-    <h1>Solicitud aprobada</h1>
-    <p>Se aprobo la solicitud de acceso para <strong>${escapeHtml(finalRecord?.clientName || record.clientName)}</strong>.</p>
-    <p>${emailResult.ok
-      ? "El correo final fue enviado al equipo de accesos."
-      : "La aprobacion quedo registrada, pero el correo final queda pendiente hasta configurar Gmail SMTP."}</p>
-    ${emailResult.ok ? "" : `<p class="muted">Detalle tecnico: ${escapeHtml(emailResult.error)}</p>`}
+    <h1>Aprobacion desde la app</h1>
+    <p>Para aprobar solicitudes, ingresa a la pagina con tu correo de socio y usa la bandeja de aprobaciones pendientes.</p>
+    <p><a href="${escapeHtml(appBaseUrl)}">${escapeHtml(appBaseUrl)}</a></p>
   `);
 }
 

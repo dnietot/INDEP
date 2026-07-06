@@ -30,6 +30,7 @@ const requestSenderEmail = (window.CONFIDENCIALIDAD_CONFIG?.requestSenderEmail |
 const clientsCsvUrl = window.CONFIDENCIALIDAD_CONFIG?.clientsCsvUrl || "clientes.csv";
 const assignmentsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.assignmentsApiUrl || "/api/assignments";
 const accessRecordsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.accessRecordsApiUrl || "/api/access-records";
+const approvalApiUrl = `${accessRecordsApiUrl.replace(/\/$/, "")}/approve`;
 const showAllClientsWhenUnassigned = window.CONFIDENCIALIDAD_CONFIG?.showAllClientsWhenUnassigned === true;
 const temporaryLogin = {
   enabled: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEnabled !== false,
@@ -64,6 +65,7 @@ const defaultClients = [
     manager: "Sin responsable",
     partnerName: "",
     partnerEmail: "",
+    partnerEmails: [],
     assignedTo: [],
     confidentialityStatus: "Pendiente"
   },
@@ -77,6 +79,7 @@ const defaultClients = [
     manager: "Sin responsable",
     partnerName: "",
     partnerEmail: "",
+    partnerEmails: [],
     assignedTo: [],
     confidentialityStatus: "Vigente"
   },
@@ -90,6 +93,7 @@ const defaultClients = [
     manager: "Sin responsable",
     partnerName: "",
     partnerEmail: "",
+    partnerEmails: [],
     assignedTo: [],
     confidentialityStatus: "Pendiente"
   },
@@ -103,6 +107,7 @@ const defaultClients = [
     manager: "Sin responsable",
     partnerName: "",
     partnerEmail: "",
+    partnerEmails: [],
     assignedTo: [],
     confidentialityStatus: "Pendiente"
   }
@@ -153,11 +158,14 @@ const assignmentEmailsInput = document.querySelector("#assignmentEmailsInput");
 const exportClientsCsvButton = document.querySelector("#exportClientsCsvButton");
 const adminClientsRows = document.querySelector("#adminClientsRows");
 const adminAccessRows = document.querySelector("#adminAccessRows");
+const partnerApprovalPanel = document.querySelector("#partnerApprovalPanel");
+const partnerApprovalRows = document.querySelector("#partnerApprovalRows");
 
 function cloneDefaultClients() {
   return defaultClients.map((client) => ({
     ...client,
-    assignedTo: [...client.assignedTo]
+    assignedTo: [...client.assignedTo],
+    partnerEmails: [...(client.partnerEmails || [])]
   }));
 }
 
@@ -238,7 +246,8 @@ function clientsFromCsv(text) {
       const focusName = getCsvValue(row, "nombre en focus", "focus", "nombre focus") || name;
       const assignedTo = parseAssignedTo(getCsvValue(row, "correos asignados", "asignados", "assigned to", "assignedTo"));
       const partnerName = getCsvValue(row, "socios asignados", "socio asignado", "socio", "partner", "partner name");
-      const partnerEmail = normalizeEmail(getCsvValue(row, "correo socios", "correo socio", "email socio", "partner email"));
+      const partnerEmails = parseAssignedTo(getCsvValue(row, "correo socios", "correo socio", "email socio", "partner email"));
+      const partnerEmail = partnerEmails[0] || "";
 
       return {
         id: buildClientIdFromNit(nit, index),
@@ -250,6 +259,7 @@ function clientsFromCsv(text) {
         manager: "Sin responsable",
         partnerName,
         partnerEmail,
+        partnerEmails,
         assignedTo,
         confidentialityStatus: "Pendiente"
       };
@@ -309,12 +319,14 @@ async function applySavedClientState(baseClients) {
   return baseClients.map((client) => {
     const legacy = findLegacyClient(client, legacyClients);
     const savedAssignments = assignments[client.id] || assignments[client.nit];
+    const partnerEmails = uniqueValues(legacy?.partnerEmails || client.partnerEmails || [legacy?.partnerEmail, client.partnerEmail]);
 
     return {
       ...client,
       assignedTo: uniqueValues(savedAssignments || client.assignedTo || []),
       partnerName: legacy?.partnerName || client.partnerName || "",
-      partnerEmail: legacy?.partnerEmail || client.partnerEmail || "",
+      partnerEmails,
+      partnerEmail: partnerEmails[0] || "",
       confidentialityStatus: legacy?.confidentialityStatus || client.confidentialityStatus || "Pendiente"
     };
   });
@@ -479,7 +491,7 @@ async function addAccessRecord(record) {
 }
 
 async function refreshAccessRecordsFromRemote() {
-  if (!isAdmin()) return;
+  if (!canReviewAccessRecords()) return;
 
   const remoteRecords = await loadRemoteAccessRecords();
   if (!remoteRecords) return;
@@ -489,11 +501,12 @@ async function refreshAccessRecordsFromRemote() {
   renderHistory();
   renderMetrics();
   renderAdminPanel();
+  renderPartnerApprovalPanel();
 }
 
 function startAccessRecordsRefresh() {
   window.clearInterval(accessRecordsRefreshTimer);
-  if (!isAdmin()) return;
+  if (!canReviewAccessRecords()) return;
 
   refreshAccessRecordsFromRemote();
   accessRecordsRefreshTimer = window.setInterval(refreshAccessRecordsFromRemote, 30000);
@@ -650,6 +663,24 @@ function isClientAssignedToCurrentUser(client) {
   });
 }
 
+function getClientPartnerEmails(client) {
+  return uniqueValues(client.partnerEmails || [client.partnerEmail]);
+}
+
+function isPartnerForCurrentUser(client) {
+  const userEmails = currentUserEmails();
+  const partnerEmails = getClientPartnerEmails(client);
+  return partnerEmails.some((partnerEmail) => userEmails.includes(partnerEmail));
+}
+
+function partnerClients() {
+  return clients.filter(isPartnerForCurrentUser);
+}
+
+function canReviewAccessRecords() {
+  return isAdmin() || partnerClients().length > 0;
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -664,7 +695,7 @@ function assignedClients() {
     return clients;
   }
 
-  const assigned = clients.filter(isClientAssignedToCurrentUser);
+  const assigned = clients.filter((client) => isClientAssignedToCurrentUser(client) || isPartnerForCurrentUser(client));
   return assigned.length > 0 || !showAllClientsWhenUnassigned ? assigned : clients;
 }
 
@@ -672,7 +703,11 @@ function renderMetrics() {
   const mine = assignedClients();
   metricClientes.textContent = mine.length;
   metricPendientes.textContent = mine.filter((client) => client.confidentialityStatus === "Pendiente").length;
-  metricEnviadas.textContent = isAdmin() ? accessRecords.length : history.length;
+  metricEnviadas.textContent = isAdmin()
+    ? accessRecords.length
+    : partnerClients().length > 0
+      ? pendingPartnerApprovals().length
+      : history.length;
 }
 
 function renderClients() {
@@ -697,6 +732,7 @@ function renderClients() {
     const item = document.createElement("article");
     item.className = `client-item${selectedClient?.id === client.id ? " is-selected" : ""}`;
     const statusClass = client.confidentialityStatus === "Pendiente" ? "pending" : "done";
+    const pendingApprovalsCount = isPartnerForCurrentUser(client) ? pendingApprovalsForClient(client.id).length : 0;
 
     item.innerHTML = `
       <div class="client-top">
@@ -705,6 +741,7 @@ function renderClients() {
           <p class="client-meta">NIT ${escapeHtml(client.nit)}</p>
           <p class="client-line">Huddle: ${escapeHtml(client.huddleName)}</p>
           <p class="client-line">Focus: ${escapeHtml(client.focusName)}</p>
+          ${pendingApprovalsCount > 0 ? `<p class="client-line">Solicitudes pendientes por aprobar: ${pendingApprovalsCount}</p>` : ""}
         </div>
         <span class="badge ${statusClass}">${client.confidentialityStatus}</span>
       </div>
@@ -722,7 +759,8 @@ function selectClient(clientId) {
   if (!selectedClient) return;
 
   selectedClientName.textContent = selectedClient.name;
-  selectedClientMeta.textContent = `NIT ${selectedClient.nit} - Huddle: ${selectedClient.huddleName} - Focus: ${selectedClient.focusName} - Socio: ${selectedClient.partnerName || "Sin socio asignado"}`;
+  const partnerEmails = getClientPartnerEmails(selectedClient).join(", ") || "sin correo";
+  selectedClientMeta.textContent = `NIT ${selectedClient.nit} - Huddle: ${selectedClient.huddleName} - Focus: ${selectedClient.focusName} - Socio: ${selectedClient.partnerName || "Sin socio asignado"} (${partnerEmails})`;
   emptyState.classList.add("is-hidden");
   surveyForm.classList.remove("is-hidden");
   mailPreview.classList.add("is-hidden");
@@ -796,7 +834,7 @@ function buildAccessSummaryRows() {
     clientName: record.clientName,
     requesterEmail: record.requesterEmail,
     partnerName: record.partnerName || "Sin socio asignado",
-    partnerEmail: record.partnerEmail || "",
+    partnerEmail: getRecordPartnerEmails(record).join(", "),
     accesses: record.accesses,
     expiresAt: record.expiresAt,
     workToDevelop: record.workToDevelop,
@@ -804,6 +842,101 @@ function buildAccessSummaryRows() {
     statusClass: getApprovalStatusClass(record),
     mailError: record.mailError || ""
   }));
+}
+
+function getRecordPartnerEmails(record) {
+  return uniqueValues(record.partnerEmails || [record.partnerEmail]);
+}
+
+function isPendingPartnerApproval(record) {
+  return getApprovalStatus(record) === "pending_partner";
+}
+
+function isRecordPendingForCurrentPartner(record) {
+  const userEmails = currentUserEmails();
+  const partnerEmails = getRecordPartnerEmails(record);
+  return isPendingPartnerApproval(record) && partnerEmails.some((email) => userEmails.includes(email));
+}
+
+function pendingPartnerApprovals() {
+  return accessRecords.filter(isRecordPendingForCurrentPartner);
+}
+
+function pendingApprovalsForClient(clientId) {
+  return pendingPartnerApprovals().filter((record) => record.clientId === clientId);
+}
+
+function renderPartnerApprovalPanel() {
+  if (!partnerApprovalPanel || !partnerApprovalRows) return;
+
+  const approvals = pendingPartnerApprovals();
+  partnerApprovalPanel.classList.toggle("is-hidden", approvals.length === 0 && partnerClients().length === 0);
+  partnerApprovalRows.innerHTML = "";
+
+  if (approvals.length === 0) {
+    partnerApprovalRows.innerHTML = `
+      <tr>
+        <td colspan="7" class="muted">No tienes solicitudes pendientes de aprobacion.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  approvals.forEach((record) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${escapeHtml(record.clientName)}</td>
+      <td>${escapeHtml(record.requesterEmail)}</td>
+      <td>${escapeHtml(record.accesses)}</td>
+      <td>${escapeHtml(record.expiresAt)}</td>
+      <td>${escapeHtml(record.workToDevelop)}</td>
+      <td><span class="badge pending">${escapeHtml(getApprovalStatusLabel(record))}</span></td>
+      <td>
+        <button class="primary small-button" type="button" data-approve-request="${escapeHtml(record.requestId)}">Aprobar</button>
+      </td>
+    `;
+    partnerApprovalRows.append(row);
+  });
+}
+
+async function approvePartnerRequest(requestId) {
+  const record = accessRecords.find((item) => item.requestId === requestId);
+  if (!record || !isRecordPendingForCurrentPartner(record)) {
+    showToast("No tienes permisos para aprobar esta solicitud.");
+    return;
+  }
+
+  try {
+    const response = await fetch(approvalApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        requestId,
+        approverEmail: currentUser.email
+      })
+    });
+    const payload = await response.json();
+
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || `Approval returned ${response.status}`);
+    }
+
+    accessRecords = Array.isArray(payload.records) ? payload.records : accessRecords.map((item) => {
+      return item.requestId === requestId ? payload.record : item;
+    });
+    localStorage.setItem(accessRecordsStorageKey, JSON.stringify(accessRecords));
+    renderHistory();
+    renderMetrics();
+    renderAdminPanel();
+    renderPartnerApprovalPanel();
+    showToast(payload.record?.approvalStatus === "sent_to_access_team"
+      ? "Solicitud aprobada y enviada al equipo de accesos."
+      : "Solicitud aprobada. El correo final queda pendiente de configuracion SMTP.");
+  } catch (error) {
+    showToast("No se pudo aprobar la solicitud. Revisa la configuracion o intenta de nuevo.");
+  }
 }
 
 function updateAssignmentFields() {
@@ -815,8 +948,9 @@ function updateAssignmentFields() {
   }
 
   const assigned = (client.assignedTo || []).join(", ") || "Sin correos asignados";
+  const partnerEmails = getClientPartnerEmails(client).join(", ") || "sin correo";
   const partner = client.partnerName
-    ? `${client.partnerName}${client.partnerEmail ? ` (${client.partnerEmail})` : ""}`
+    ? `${client.partnerName} (${partnerEmails})`
     : "Sin socio asignado";
   assignmentClientMeta.textContent = `NIT ${client.nit} - Huddle: ${client.huddleName} - Focus: ${client.focusName} - Socio: ${partner} - Asignados: ${assigned}`;
   assignmentEmailsInput.value = "";
@@ -859,7 +993,7 @@ function renderAdminPanel() {
       <td>${escapeHtml(client.huddleName)}</td>
       <td>${escapeHtml(client.focusName)}</td>
       <td>${escapeHtml(client.partnerName || "Sin socio")}</td>
-      <td>${escapeHtml(client.partnerEmail || "")}</td>
+      <td>${escapeHtml(getClientPartnerEmails(client).join(", "))}</td>
       <td>
         <input class="inline-input" type="text" value="${escapeHtml((client.assignedTo || []).join(", "))}" data-assignments-for="${escapeHtml(client.id)}">
       </td>
@@ -915,6 +1049,7 @@ function buildAccessRequestPayload(formData) {
     manager: selectedClient.manager,
     partnerName: selectedClient.partnerName,
     partnerEmail: selectedClient.partnerEmail,
+    partnerEmails: getClientPartnerEmails(selectedClient),
     requesterName: currentUser.name,
     requesterEmail: currentUser.email,
     senderEmail: requestSenderEmail,
@@ -939,7 +1074,7 @@ function buildEmailPreview(payload) {
     `Nombre en Huddle: ${payload.huddleName}`,
     `Nombre en Focus: ${payload.focusName}`,
     `Solicitante: ${payload.requesterName} (${payload.requesterEmail})`,
-    `Socio aprobador: ${payload.partnerName || "Sin socio asignado"} (${payload.partnerEmail || "sin correo"})`,
+    `Socio aprobador: ${payload.partnerName || "Sin socio asignado"} (${(payload.partnerEmails || [payload.partnerEmail]).filter(Boolean).join(", ") || "sin correo"})`,
     `Accesos solicitados: ${payload.accesses}`,
     `Vigencia maxima: ${payload.expiresAt}`,
     `Trabajo a desarrollar: ${payload.workToDevelop}`,
@@ -947,7 +1082,7 @@ function buildEmailPreview(payload) {
     "Confirmacion de uso autorizado: Si"
   ].join(" | ");
 
-  mailTo.textContent = payload.partnerEmail || "Sin correo de socio configurado";
+  mailTo.textContent = (payload.partnerEmails || [payload.partnerEmail]).filter(Boolean).join("; ") || "Sin correo de socio configurado";
   mailSubject.textContent = subject;
   mailBody.textContent = body;
   mailPreview.classList.remove("is-hidden");
@@ -984,6 +1119,7 @@ async function submitSurvey(event) {
   renderClients();
   renderMetrics();
   renderAdminPanel();
+  renderPartnerApprovalPanel();
   updateSubmitState();
 
   showToast(savedRemoteRecord
@@ -1128,6 +1264,7 @@ function startSession() {
   renderClients();
   renderHistory();
   renderAdminPanel();
+  renderPartnerApprovalPanel();
   renderMetrics();
   startAccessRecordsRefresh();
 }
@@ -1252,6 +1389,7 @@ async function logout() {
   authScreen.classList.remove("is-hidden");
   appShell.classList.add("is-hidden");
   adminPanel.classList.add("is-hidden");
+  partnerApprovalPanel?.classList.add("is-hidden");
 }
 
 async function handleClientAdminSubmit(event) {
@@ -1285,6 +1423,7 @@ async function handleClientAdminSubmit(event) {
   assignmentEmailsInput.value = "";
   renderClients();
   renderAdminPanel();
+  renderPartnerApprovalPanel();
   renderMetrics();
   showToast(addedCount > 0
     ? savedRemote ? "Correos agregados y guardados globalmente." : "Correos agregados en este navegador. La API global no respondio."
@@ -1308,6 +1447,7 @@ async function removeClient(clientId) {
   renderClients();
   renderHistory();
   renderAdminPanel();
+  renderPartnerApprovalPanel();
   renderMetrics();
   showToast("Cliente eliminado.");
 }
@@ -1331,6 +1471,7 @@ async function saveClientAssignments(clientId, value) {
   const savedRemote = await saveClients();
   renderClients();
   renderAdminPanel();
+  renderPartnerApprovalPanel();
   renderMetrics();
   showToast(assignedTo.length === 0
     ? "No se agregaron correos."
@@ -1352,7 +1493,7 @@ function buildClientsCsv() {
     client.huddleName,
     client.focusName,
     client.partnerName || "",
-    client.partnerEmail || "",
+    getClientPartnerEmails(client).join("; "),
     (client.assignedTo || []).join("; ")
   ]);
 
@@ -1401,6 +1542,12 @@ clientList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-client-id]");
   if (!button) return;
   selectClient(button.dataset.clientId);
+});
+
+partnerApprovalRows?.addEventListener("click", (event) => {
+  const approveButton = event.target.closest("[data-approve-request]");
+  if (!approveButton) return;
+  approvePartnerRequest(approveButton.dataset.approveRequest);
 });
 
 adminClientsRows.addEventListener("click", (event) => {

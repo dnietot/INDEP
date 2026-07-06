@@ -6,7 +6,7 @@ Este prototipo muestra el flujo esperado:
 2. Listado de clientes asignados al usuario.
 3. Boton Confidencialidad por cliente.
 4. Formulario de encuesta para el correo autenticado.
-5. Aprobacion del socio asignado al cliente.
+5. Aprobacion del socio asignado al cliente desde su perfil en la app.
 6. Envio automatico del correo final al equipo de accesos despues de la aprobacion.
 7. Panel admin para ver clientes, socios, solicitudes y estados.
 
@@ -74,11 +74,11 @@ Contrasena admin: Admin2026*
 
 El perfil `admin` puede ver todos los clientes, revisar las solicitudes registradas por correo Baker y plataforma, agregar/quitar clientes, actualizar correos asignados y ver el estado de aprobacion del socio.
 
-La solicitud queda primero como `Pendiente socio`. Si Gmail SMTP esta configurado en Render, el sistema envia al socio un correo con enlace de aprobacion. Cuando el socio aprueba, el backend envia el correo final al equipo de accesos. Si Gmail no esta configurado, la solicitud queda registrada y el panel admin muestra el detalle tecnico como correo pendiente.
+La solicitud queda primero como `Pendiente socio`. Si Gmail SMTP esta configurado en Render, el sistema notifica al socio por correo para que entre a la app. Cuando el socio inicia sesion con su correo, ve sus clientes del CSV y las solicitudes pendientes por cliente. Al aprobar desde su perfil, el backend envia el correo final al equipo de accesos. Si Gmail no esta configurado, la solicitud queda registrada y el panel admin muestra el detalle tecnico como correo pendiente.
 
 Para la prueba con Gmail, crear un correo remitente y configurar en Render `SMTP_USER`, `SMTP_PASS` y `SMTP_FROM`. En Gmail normalmente se usa una app password, no la contrasena normal de la cuenta.
 
-Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus`, `socios asignados`, `correo socios` y `correos asignados`. El panel admin agrega correos nuevos sin borrar los ya asignados y los guarda en `/api/assignments`. Las solicitudes se guardan en `/api/access-records`, para que aparezcan en el panel admin aunque las haya enviado otro usuario. Para produccion se recomienda conectar SharePoint Lists, Dataverse o una base de datos persistente.
+Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus`, `socios asignados`, `correo socios` y `correos asignados`. La columna `correo socios` acepta uno o varios correos separados por coma, punto y coma o salto de linea. El panel admin agrega correos nuevos sin borrar los ya asignados y los guarda en `/api/assignments`. Las solicitudes se guardan en `/api/access-records`, para que aparezcan en el panel admin aunque las haya enviado otro usuario. Para produccion se recomienda conectar SharePoint Lists, Dataverse o una base de datos persistente.
 
 Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve los clientes donde su correo este asignado por el admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 

@@ -122,6 +122,8 @@ El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o 
 
 Importante: Render publica ahora un servicio Node que sirve la app y expone `/api/assignments`, `/api/access-records` y `/api/access-records/approve`. El catalogo base de clientes se lee desde `clientes.csv`; el archivo soporta las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus`, `socios asignados`, `correo socios` y `correos asignados`. Las asignaciones hechas desde el panel admin se guardan globalmente en la API para la prueba, de modo que otros usuarios de Office 365 puedan ver sus clientes asignados. Las solicitudes enviadas por usuarios se guardan en `/api/access-records` para que aparezcan en el panel admin.
 
+La columna `correo socios` acepta uno o varios correos separados por coma, punto y coma o salto de linea. Cualquiera de esos socios puede entrar a su perfil en la app y aprobar solicitudes pendientes del cliente.
+
 Para produccion, mover esas asignaciones a SharePoint Lists, Dataverse o una base de datos persistente. El almacenamiento local del servicio sirve para validacion, pero puede perderse si Render recrea la instancia.
 
 Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve clientes cuando su correo esta asignado por admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
@@ -147,4 +149,4 @@ SMTP_FROM=<correo gmail>
 
 5. Hacer redeploy.
 
-Al registrar una solicitud, el sistema envia un correo al socio del cliente con un enlace de aprobacion. Cuando el socio abre el enlace, el backend registra la aprobacion y envia el correo final a `ACCESS_TEAM_EMAILS`. Si Gmail no esta configurado, la solicitud queda guardada con estado pendiente y el panel admin muestra el detalle tecnico.
+Al registrar una solicitud, el sistema notifica al socio del cliente por correo. El socio debe entrar a `https://indep.onrender.com` con su correo Baker, ver sus clientes y aprobar las solicitudes pendientes desde su perfil. Al aprobar, el backend registra la aprobacion y envia el correo final a `ACCESS_TEAM_EMAILS`. Si Gmail no esta configurado, la solicitud queda guardada con estado pendiente y el panel admin muestra el detalle tecnico.
