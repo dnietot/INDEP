@@ -42,6 +42,7 @@ TEMP_ADMIN_NAME=Admin
 TEMP_ADMIN_EMAIL=admin@bakertilly.co
 TEMP_ADMIN_PASSWORD_HASH=8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec
 EMAIL_WEBHOOK_URL=<URL del flujo de Power Automate>
+REQUEST_SENDER_EMAIL=accesos@bakertilly.co
 CLIENTS_CSV_URL=clientes.csv
 ASSIGNMENTS_API_URL=/api/assignments
 ACCESS_RECORDS_API_URL=/api/access-records
@@ -66,7 +67,9 @@ Contrasena admin: Admin2026*
 
 El perfil `admin` puede ver todos los clientes, revisar las solicitudes registradas por correo Baker y plataforma, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
 
-Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate. El cuerpo enviado incluye `requestedUsers` como arreglo y `requestedUserEmails` como texto separado por comas.
+Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate. El cuerpo enviado incluye `requestedUsers` como arreglo, `requestedUserEmails` como texto separado por comas y `senderEmail` con el valor de `REQUEST_SENDER_EMAIL`.
+
+Para que todas las solicitudes salgan desde un correo general, TI debe crear o habilitar un buzon compartido, por ejemplo `accesos@bakertilly.co`, dar permiso `Enviar como` a la cuenta que ejecuta el flujo de Power Automate y usar la accion Office 365 Outlook `Send an email from a shared mailbox (V2)`.
 
 Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y la columna opcional `correos asignados`. El panel admin agrega correos nuevos sin borrar los ya asignados y los guarda en `/api/assignments`. Las solicitudes se guardan en `/api/access-records`, para que aparezcan en el panel admin aunque las haya enviado otro usuario. Para produccion se recomienda conectar SharePoint Lists, Dataverse o una base de datos persistente.
 

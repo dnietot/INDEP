@@ -27,6 +27,7 @@ const office365Auth = {
 const allowedEmailDomain = window.CONFIDENCIALIDAD_CONFIG?.allowedEmailDomain || "@bakertilly.co";
 const graphMeEndpoint = "https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName,otherMails";
 const emailWebhookUrl = window.CONFIDENCIALIDAD_CONFIG?.emailWebhookUrl || "";
+const requestSenderEmail = (window.CONFIDENCIALIDAD_CONFIG?.requestSenderEmail || "accesos@bakertilly.co").toLowerCase();
 const clientsCsvUrl = window.CONFIDENCIALIDAD_CONFIG?.clientsCsvUrl || "clientes.csv";
 const assignmentsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.assignmentsApiUrl || "/api/assignments";
 const accessRecordsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.accessRecordsApiUrl || "/api/access-records";
@@ -533,6 +534,16 @@ function isAdmin() {
   return currentUser.role === "admin";
 }
 
+function requireAdminAction() {
+  if (isAdmin()) {
+    return true;
+  }
+
+  showToast("Solo el perfil admin puede modificar clientes, asignaciones o configuracion.");
+  renderAdminPanel();
+  return false;
+}
+
 function getEffectiveEmailWebhookUrl() {
   return localStorage.getItem(webhookStorageKey) || emailWebhookUrl;
 }
@@ -705,6 +716,7 @@ function setDefaultDate() {
 
 function setDefaultRequestedUsers() {
   surveyForm.elements.usuariosAcceso.value = formatUsersForTextarea([currentUser.email]);
+  surveyForm.elements.usuariosAcceso.readOnly = !isAdmin();
 }
 
 function getSelectedAccesses(formData = new FormData(surveyForm)) {
@@ -712,6 +724,10 @@ function getSelectedAccesses(formData = new FormData(surveyForm)) {
 }
 
 function updateSubmitState() {
+  if (!isAdmin()) {
+    surveyForm.elements.usuariosAcceso.value = formatUsersForTextarea([currentUser.email]);
+  }
+
   const formData = new FormData(surveyForm);
   const hasAccess = getSelectedAccesses(formData).length > 0;
   const requestedUsers = parseRequestedUsers(formData.get("usuariosAcceso"));
@@ -860,7 +876,9 @@ function renderAdminPanel() {
 
 function buildAccessRequestPayload(formData) {
   const accesses = getSelectedAccesses(formData).join(", ");
-  const requestedUsers = parseRequestedUsers(formData.get("usuariosAcceso"));
+  const requestedUsers = isAdmin()
+    ? parseRequestedUsers(formData.get("usuariosAcceso"))
+    : uniqueValues([currentUser.email]);
 
   return {
     requestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -874,6 +892,7 @@ function buildAccessRequestPayload(formData) {
     manager: selectedClient.manager,
     requesterName: currentUser.name,
     requesterEmail: currentUser.email,
+    senderEmail: requestSenderEmail,
     requestedUsers,
     requestedUserEmails: requestedUsers.join(", "),
     accesses,
@@ -888,6 +907,7 @@ function buildAccessRequestPayload(formData) {
 function buildEmailPreview(payload) {
   const subject = `[Confidencialidad] Solicitud de acceso - ${payload.clientName} - ${payload.requesterEmail}`;
   const body = [
+    `Remitente sugerido: ${payload.senderEmail}`,
     `Cliente: ${payload.clientName}`,
     `NIT: ${payload.nit}`,
     `Nombre en Huddle: ${payload.huddleName}`,
@@ -936,6 +956,12 @@ async function submitSurvey(event) {
 
   if (requestedUsers.length === 0 || !requestedUsers.every(isBakerEmail)) {
     showToast(`Agrega correos validos que terminen en ${allowedEmailDomain}.`);
+    return;
+  }
+
+  if (!isAdmin() && uniqueValues(requestedUsers).join(",") !== normalizeEmail(currentUser.email)) {
+    setDefaultRequestedUsers();
+    showToast("Solo puedes solicitar acceso para tu propio correo.");
     return;
   }
 
@@ -1240,6 +1266,8 @@ async function logout() {
 
 function handleEmailConfigSubmit(event) {
   event.preventDefault();
+  if (!requireAdminAction()) return;
+
   const url = webhookUrlInput.value.trim();
 
   if (url) {
@@ -1254,6 +1282,8 @@ function handleEmailConfigSubmit(event) {
 }
 
 function clearWebhookConfig() {
+  if (!requireAdminAction()) return;
+
   webhookUrlInput.value = "";
   localStorage.removeItem(webhookStorageKey);
   showToast("URL del flujo eliminada.");
@@ -1262,6 +1292,8 @@ function clearWebhookConfig() {
 
 async function handleClientAdminSubmit(event) {
   event.preventDefault();
+  if (!requireAdminAction()) return;
+
   const formData = new FormData(clientAdminForm);
   const client = clients.find((item) => item.id === String(formData.get("clientId")));
   const assignedTo = parseAssignedTo(formData.get("assignedTo"));
@@ -1296,6 +1328,8 @@ async function handleClientAdminSubmit(event) {
 }
 
 async function removeClient(clientId) {
+  if (!requireAdminAction()) return;
+
   clients = clients.filter((client) => client.id !== clientId);
   accessRecords = accessRecords.filter((record) => record.clientId !== clientId);
   await saveClients();
@@ -1315,6 +1349,8 @@ async function removeClient(clientId) {
 }
 
 async function saveClientAssignments(clientId, value) {
+  if (!requireAdminAction()) return;
+
   const client = clients.find((item) => item.id === clientId);
   if (!client) return;
 
@@ -1360,6 +1396,8 @@ function buildClientsCsv() {
 }
 
 function downloadClientsCsv() {
+  if (!requireAdminAction()) return;
+
   const blob = new Blob([buildClientsCsv()], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

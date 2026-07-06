@@ -43,6 +43,7 @@ Configurar estas variables de entorno:
 | TEMP_ADMIN_EMAIL | `admin@bakertilly.co` |
 | TEMP_ADMIN_PASSWORD_HASH | Hash SHA-256 de la contrasena temporal del admin |
 | EMAIL_WEBHOOK_URL | URL del flujo de Power Automate que enviara el correo |
+| REQUEST_SENDER_EMAIL | Buzon general sugerido para enviar las solicitudes, por ejemplo `accesos@bakertilly.co` |
 | CLIENTS_CSV_URL | `clientes.csv` |
 | ASSIGNMENTS_API_URL | `/api/assignments` |
 | ACCESS_RECORDS_API_URL | `/api/access-records` |
@@ -130,7 +131,7 @@ Para la prueba rapida, usar Power Automate:
 json(triggerBody())
 ```
 
-3. Agregar la accion Office 365 Outlook `Send an email (V2)`.
+3. Agregar la accion Office 365 Outlook `Send an email (V2)`. Si se quiere que todas las solicitudes salgan desde un correo general, pedir a TI un buzon compartido, por ejemplo `accesos@bakertilly.co`, dar permiso `Enviar como` a la cuenta del flujo y usar `Send an email from a shared mailbox (V2)`.
 4. Usar como destinatarios los encargados de accesos, por ejemplo:
 
 ```text
@@ -153,6 +154,7 @@ accesos@bakertilly.co; seguridad.informacion@bakertilly.co
   <tr><td><strong>Nombre en Huddle</strong></td><td>@{outputs('Compose')?['huddleName']}</td></tr>
   <tr><td><strong>Nombre en Focus</strong></td><td>@{outputs('Compose')?['focusName']}</td></tr>
   <tr><td><strong>Solicitante</strong></td><td>@{outputs('Compose')?['requesterName']} (@{outputs('Compose')?['requesterEmail']})</td></tr>
+  <tr><td><strong>Remitente sugerido</strong></td><td>@{outputs('Compose')?['senderEmail']}</td></tr>
   <tr><td><strong>Usuarios que requieren acceso</strong></td><td>@{outputs('Compose')?['requestedUserEmails']}</td></tr>
   <tr><td><strong>Accesos solicitados</strong></td><td>@{outputs('Compose')?['accesses']}</td></tr>
   <tr><td><strong>Vigencia maxima</strong></td><td>@{outputs('Compose')?['expiresAt']}</td></tr>

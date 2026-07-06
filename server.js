@@ -91,6 +91,7 @@ function normalizeAccessRecord(record) {
     manager: String(record.manager || ""),
     requesterName: String(record.requesterName || ""),
     requesterEmail: normalizeEmail(record.requesterEmail),
+    senderEmail: normalizeEmail(record.senderEmail),
     requestedUsers: Array.isArray(record.requestedUsers)
       ? [...new Set(record.requestedUsers.map(normalizeEmail).filter(Boolean))]
       : [],
