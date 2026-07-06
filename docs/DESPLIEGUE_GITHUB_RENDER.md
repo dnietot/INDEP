@@ -42,8 +42,14 @@ Configurar estas variables de entorno:
 | TEMP_ADMIN_NAME | `Admin` |
 | TEMP_ADMIN_EMAIL | `admin@bakertilly.co` |
 | TEMP_ADMIN_PASSWORD_HASH | Hash SHA-256 de la contrasena temporal del admin |
-| EMAIL_WEBHOOK_URL | URL del flujo de Power Automate que enviara el correo |
-| REQUEST_SENDER_EMAIL | Buzon general sugerido para enviar las solicitudes, por ejemplo `accesos@bakertilly.co` |
+| REQUEST_SENDER_EMAIL | Correo remitente mostrado en la app |
+| APP_BASE_URL | URL publica de Render, por ejemplo `https://indep.onrender.com` |
+| ACCESS_TEAM_EMAILS | Correos que reciben la solicitud despues de la aprobacion |
+| SMTP_HOST | `smtp.gmail.com` |
+| SMTP_PORT | `465` |
+| SMTP_USER | Correo Gmail remitente |
+| SMTP_PASS | App password de Gmail, guardar como secreto |
+| SMTP_FROM | Correo Gmail remitente |
 | CLIENTS_CSV_URL | `clientes.csv` |
 | ASSIGNMENTS_API_URL | `/api/assignments` |
 | ACCESS_RECORDS_API_URL | `/api/access-records` |
@@ -112,59 +118,33 @@ Usuario: admin
 Contrasena: Admin2026*
 ```
 
-El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o Focus, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
+El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o Focus, ver el socio asignado, agregar/quitar clientes, actualizar correos asignados y revisar el estado de aprobacion.
 
-Importante: Render publica ahora un servicio Node que sirve la app y expone `/api/assignments` y `/api/access-records`. El catalogo base de clientes se lee desde `clientes.csv`; el archivo soporta las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y `correos asignados`. Las asignaciones hechas desde el panel admin se guardan globalmente en la API para la prueba, de modo que otros usuarios de Office 365 puedan ver sus clientes asignados. Las solicitudes enviadas por usuarios se guardan en `/api/access-records` para que aparezcan en el panel admin.
+Importante: Render publica ahora un servicio Node que sirve la app y expone `/api/assignments`, `/api/access-records` y `/api/access-records/approve`. El catalogo base de clientes se lee desde `clientes.csv`; el archivo soporta las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus`, `socios asignados`, `correo socios` y `correos asignados`. Las asignaciones hechas desde el panel admin se guardan globalmente en la API para la prueba, de modo que otros usuarios de Office 365 puedan ver sus clientes asignados. Las solicitudes enviadas por usuarios se guardan en `/api/access-records` para que aparezcan en el panel admin.
 
 Para produccion, mover esas asignaciones a SharePoint Lists, Dataverse o una base de datos persistente. El almacenamiento local del servicio sirve para validacion, pero puede perderse si Render recrea la instancia.
 
 Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve clientes cuando su correo esta asignado por admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 
-## Envio automatico de correo
+## Envio automatico con Gmail
 
-Para la prueba rapida, usar Power Automate:
+Para la prueba rapida con Gmail:
 
-1. Crear un flujo automatizado con el disparador `When an HTTP request is received`.
-2. En el flujo, convertir el cuerpo recibido a JSON. Si llega como texto, usar la expresion:
-
-```text
-json(triggerBody())
-```
-
-3. Agregar la accion Office 365 Outlook `Send an email (V2)`. Si se quiere que todas las solicitudes salgan desde un correo general, pedir a TI un buzon compartido, por ejemplo `accesos@bakertilly.co`, dar permiso `Enviar como` a la cuenta del flujo y usar `Send an email from a shared mailbox (V2)`.
-4. Usar como destinatarios los encargados de accesos, por ejemplo:
+1. Crear el correo Gmail remitente.
+2. Habilitar verificacion en dos pasos en esa cuenta.
+3. Crear una app password para la app.
+4. En Render, configurar:
 
 ```text
-accesos@bakertilly.co; seguridad.informacion@bakertilly.co
+APP_BASE_URL=https://indep.onrender.com
+ACCESS_TEAM_EMAILS=accesos@bakertilly.co,seguridad.informacion@bakertilly.co
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=<correo gmail>
+SMTP_PASS=<app password>
+SMTP_FROM=<correo gmail>
 ```
 
-5. Asunto sugerido:
+5. Hacer redeploy.
 
-```text
-[Confidencialidad] Solicitud de acceso - @{outputs('Compose')?['clientName']} - @{outputs('Compose')?['requesterEmail']}
-```
-
-6. Cuerpo sugerido:
-
-```html
-<p>Se registro una nueva solicitud de acceso.</p>
-<table>
-  <tr><td><strong>Cliente</strong></td><td>@{outputs('Compose')?['clientName']}</td></tr>
-  <tr><td><strong>NIT</strong></td><td>@{outputs('Compose')?['nit']}</td></tr>
-  <tr><td><strong>Nombre en Huddle</strong></td><td>@{outputs('Compose')?['huddleName']}</td></tr>
-  <tr><td><strong>Nombre en Focus</strong></td><td>@{outputs('Compose')?['focusName']}</td></tr>
-  <tr><td><strong>Solicitante</strong></td><td>@{outputs('Compose')?['requesterName']} (@{outputs('Compose')?['requesterEmail']})</td></tr>
-  <tr><td><strong>Remitente sugerido</strong></td><td>@{outputs('Compose')?['senderEmail']}</td></tr>
-  <tr><td><strong>Usuarios que requieren acceso</strong></td><td>@{outputs('Compose')?['requestedUserEmails']}</td></tr>
-  <tr><td><strong>Accesos solicitados</strong></td><td>@{outputs('Compose')?['accesses']}</td></tr>
-  <tr><td><strong>Vigencia maxima</strong></td><td>@{outputs('Compose')?['expiresAt']}</td></tr>
-  <tr><td><strong>Trabajo a desarrollar</strong></td><td>@{outputs('Compose')?['workToDevelop']}</td></tr>
-  <tr><td><strong>Sin conflicto de interes</strong></td><td>Si</td></tr>
-  <tr><td><strong>Confirmacion de uso autorizado</strong></td><td>Si</td></tr>
-</table>
-```
-
-7. Guardar el flujo y copiar la URL HTTP generada.
-8. En Render, agregar la variable `EMAIL_WEBHOOK_URL` con esa URL y hacer redeploy. Para una prueba puntual tambien se puede entrar con el perfil `admin` y guardar la URL desde el panel web; esa opcion queda guardada solo en ese navegador.
-
-Nota: esta URL funciona como un secreto. Para demo esta bien, pero en produccion debe ocultarse detras de un backend o autenticacion real.
+Al registrar una solicitud, el sistema envia un correo al socio del cliente con un enlace de aprobacion. Cuando el socio abre el enlace, el backend registra la aprobacion y envia el correo final a `ACCESS_TEAM_EMAILS`. Si Gmail no esta configurado, la solicitud queda guardada con estado pendiente y el panel admin muestra el detalle tecnico.

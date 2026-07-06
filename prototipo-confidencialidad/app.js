@@ -26,7 +26,6 @@ const office365Auth = {
 
 const allowedEmailDomain = window.CONFIDENCIALIDAD_CONFIG?.allowedEmailDomain || "@bakertilly.co";
 const graphMeEndpoint = "https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName,otherMails";
-const emailWebhookUrl = window.CONFIDENCIALIDAD_CONFIG?.emailWebhookUrl || "";
 const requestSenderEmail = (window.CONFIDENCIALIDAD_CONFIG?.requestSenderEmail || "accesos@bakertilly.co").toLowerCase();
 const clientsCsvUrl = window.CONFIDENCIALIDAD_CONFIG?.clientsCsvUrl || "clientes.csv";
 const assignmentsApiUrl = window.CONFIDENCIALIDAD_CONFIG?.assignmentsApiUrl || "/api/assignments";
@@ -48,7 +47,6 @@ const temporaryAdmin = {
 const clientsStorageKey = "confidencialidadClients";
 const clientAssignmentsStorageKey = "confidencialidadClientAssignments";
 const accessRecordsStorageKey = "confidencialidadAccessRecords";
-const webhookStorageKey = "confidencialidadEmailWebhookUrl";
 
 const accessTeam = [
   "accesos@bakertilly.co",
@@ -64,6 +62,8 @@ const defaultClients = [
     focusName: "Andes Retail",
     serviceLine: "Sin linea",
     manager: "Sin responsable",
+    partnerName: "",
+    partnerEmail: "",
     assignedTo: [],
     confidentialityStatus: "Pendiente"
   },
@@ -75,6 +75,8 @@ const defaultClients = [
     focusName: "Constructora Norte",
     serviceLine: "Sin linea",
     manager: "Sin responsable",
+    partnerName: "",
+    partnerEmail: "",
     assignedTo: [],
     confidentialityStatus: "Vigente"
   },
@@ -86,6 +88,8 @@ const defaultClients = [
     focusName: "Logisticos Delta",
     serviceLine: "Sin linea",
     manager: "Sin responsable",
+    partnerName: "",
+    partnerEmail: "",
     assignedTo: [],
     confidentialityStatus: "Pendiente"
   },
@@ -97,6 +101,8 @@ const defaultClients = [
     focusName: "Fondo Aurora",
     serviceLine: "Sin linea",
     manager: "Sin responsable",
+    partnerName: "",
+    partnerEmail: "",
     assignedTo: [],
     confidentialityStatus: "Pendiente"
   }
@@ -139,9 +145,7 @@ const metricClientes = document.querySelector("#metricClientes");
 const metricPendientes = document.querySelector("#metricPendientes");
 const metricEnviadas = document.querySelector("#metricEnviadas");
 const adminPanel = document.querySelector("#adminPanel");
-const emailConfigForm = document.querySelector("#emailConfigForm");
-const webhookUrlInput = document.querySelector("#webhookUrlInput");
-const clearWebhookButton = document.querySelector("#clearWebhookButton");
+const smtpConfigInput = document.querySelector("#smtpConfigInput");
 const clientAdminForm = document.querySelector("#clientAdminForm");
 const assignmentClientSelect = document.querySelector("#assignmentClientSelect");
 const assignmentClientMeta = document.querySelector("#assignmentClientMeta");
@@ -233,6 +237,8 @@ function clientsFromCsv(text) {
       const huddleName = getCsvValue(row, "nombre en huddle", "huddle", "nombre huddle") || name;
       const focusName = getCsvValue(row, "nombre en focus", "focus", "nombre focus") || name;
       const assignedTo = parseAssignedTo(getCsvValue(row, "correos asignados", "asignados", "assigned to", "assignedTo"));
+      const partnerName = getCsvValue(row, "socios asignados", "socio asignado", "socio", "partner", "partner name");
+      const partnerEmail = normalizeEmail(getCsvValue(row, "correo socios", "correo socio", "email socio", "partner email"));
 
       return {
         id: buildClientIdFromNit(nit, index),
@@ -242,6 +248,8 @@ function clientsFromCsv(text) {
         focusName,
         serviceLine: "Sin linea",
         manager: "Sin responsable",
+        partnerName,
+        partnerEmail,
         assignedTo,
         confidentialityStatus: "Pendiente"
       };
@@ -305,6 +313,8 @@ async function applySavedClientState(baseClients) {
     return {
       ...client,
       assignedTo: uniqueValues(savedAssignments || client.assignedTo || []),
+      partnerName: legacy?.partnerName || client.partnerName || "",
+      partnerEmail: legacy?.partnerEmail || client.partnerEmail || "",
       confidentialityStatus: legacy?.confidentialityStatus || client.confidentialityStatus || "Pendiente"
     };
   });
@@ -499,8 +509,9 @@ function buildHistoryFromAccessRecords() {
     date: new Date(record.submittedAt).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
     clientName: record.clientName,
     user: record.requesterEmail,
-    requestedUsers: getRecordRequestedUsers(record).join(", "),
-    accesses: record.accesses
+    accesses: record.accesses,
+    status: getApprovalStatusLabel(record),
+    statusClass: getApprovalStatusClass(record)
   }));
 }
 
@@ -534,6 +545,24 @@ function isAdmin() {
   return currentUser.role === "admin";
 }
 
+function getApprovalStatus(record) {
+  return record?.approvalStatus || "pending_partner";
+}
+
+function getApprovalStatusLabel(record) {
+  const status = getApprovalStatus(record);
+
+  if (status === "sent_to_access_team") return "Enviado a accesos";
+  if (status === "approved_pending_email") return "Aprobado, correo pendiente";
+  if (status === "approved") return "Aprobado por socio";
+  return "Pendiente socio";
+}
+
+function getApprovalStatusClass(record) {
+  const status = getApprovalStatus(record);
+  return status === "sent_to_access_team" || status === "approved" ? "done" : "pending";
+}
+
 function requireAdminAction() {
   if (isAdmin()) {
     return true;
@@ -542,10 +571,6 @@ function requireAdminAction() {
   showToast("Solo el perfil admin puede modificar clientes, asignaciones o configuracion.");
   renderAdminPanel();
   return false;
-}
-
-function getEffectiveEmailWebhookUrl() {
-  return localStorage.getItem(webhookStorageKey) || emailWebhookUrl;
 }
 
 function normalizeEmail(value) {
@@ -697,7 +722,7 @@ function selectClient(clientId) {
   if (!selectedClient) return;
 
   selectedClientName.textContent = selectedClient.name;
-  selectedClientMeta.textContent = `NIT ${selectedClient.nit} - Huddle: ${selectedClient.huddleName} - Focus: ${selectedClient.focusName}`;
+  selectedClientMeta.textContent = `NIT ${selectedClient.nit} - Huddle: ${selectedClient.huddleName} - Focus: ${selectedClient.focusName} - Socio: ${selectedClient.partnerName || "Sin socio asignado"}`;
   emptyState.classList.add("is-hidden");
   surveyForm.classList.remove("is-hidden");
   mailPreview.classList.add("is-hidden");
@@ -715,8 +740,6 @@ function setDefaultDate() {
 }
 
 function setDefaultRequestedUsers() {
-  surveyForm.elements.usuariosAcceso.value = formatUsersForTextarea([currentUser.email]);
-  surveyForm.elements.usuariosAcceso.readOnly = !isAdmin();
 }
 
 function getSelectedAccesses(formData = new FormData(surveyForm)) {
@@ -724,20 +747,14 @@ function getSelectedAccesses(formData = new FormData(surveyForm)) {
 }
 
 function updateSubmitState() {
-  if (!isAdmin()) {
-    surveyForm.elements.usuariosAcceso.value = formatUsersForTextarea([currentUser.email]);
-  }
-
   const formData = new FormData(surveyForm);
   const hasAccess = getSelectedAccesses(formData).length > 0;
-  const requestedUsers = parseRequestedUsers(formData.get("usuariosAcceso"));
-  const hasValidRequestedUsers = requestedUsers.length > 0 && requestedUsers.every(isBakerEmail);
   const hasDate = Boolean(formData.get("vigencia"));
   const hasWork = Boolean((formData.get("trabajo") || "").trim());
   const hasNoConflict = formData.get("sinConflicto") === "on";
   const hasConfirmation = formData.get("aceptacion") === "on";
 
-  submitSurveyButton.disabled = !(hasAccess && hasValidRequestedUsers && hasDate && hasWork && hasNoConflict && hasConfirmation);
+  submitSurveyButton.disabled = !(hasAccess && hasDate && hasWork && hasNoConflict && hasConfirmation);
 }
 
 function showToast(message) {
@@ -755,7 +772,7 @@ function renderHistory() {
   if (history.length === 0) {
     historyRows.innerHTML = `
       <tr>
-        <td colspan="6" class="muted">Sin envios registrados en esta sesion.</td>
+        <td colspan="5" class="muted">Sin envios registrados en esta sesion.</td>
       </tr>
     `;
     return;
@@ -767,25 +784,26 @@ function renderHistory() {
       <td>${escapeHtml(item.date)}</td>
       <td>${escapeHtml(item.clientName)}</td>
       <td>${escapeHtml(item.user)}</td>
-      <td>${escapeHtml(item.requestedUsers)}</td>
       <td>${escapeHtml(item.accesses)}</td>
-      <td><span class="badge done">Correo preparado</span></td>
+      <td><span class="badge ${escapeHtml(item.statusClass)}">${escapeHtml(item.status)}</span></td>
     `;
     historyRows.append(row);
   });
 }
 
 function buildAccessSummaryRows() {
-  return accessRecords.flatMap((record) => {
-    return getRecordRequestedUsers(record).map((requestedUser) => ({
-      clientName: record.clientName,
-      requestedUser,
-      accesses: record.accesses,
-      expiresAt: record.expiresAt,
-      workToDevelop: record.workToDevelop,
-      requesterEmail: record.requesterEmail
-    }));
-  });
+  return accessRecords.map((record) => ({
+    clientName: record.clientName,
+    requesterEmail: record.requesterEmail,
+    partnerName: record.partnerName || "Sin socio asignado",
+    partnerEmail: record.partnerEmail || "",
+    accesses: record.accesses,
+    expiresAt: record.expiresAt,
+    workToDevelop: record.workToDevelop,
+    status: getApprovalStatusLabel(record),
+    statusClass: getApprovalStatusClass(record),
+    mailError: record.mailError || ""
+  }));
 }
 
 function updateAssignmentFields() {
@@ -797,7 +815,10 @@ function updateAssignmentFields() {
   }
 
   const assigned = (client.assignedTo || []).join(", ") || "Sin correos asignados";
-  assignmentClientMeta.textContent = `NIT ${client.nit} - Huddle: ${client.huddleName} - Focus: ${client.focusName} - Asignados: ${assigned}`;
+  const partner = client.partnerName
+    ? `${client.partnerName}${client.partnerEmail ? ` (${client.partnerEmail})` : ""}`
+    : "Sin socio asignado";
+  assignmentClientMeta.textContent = `NIT ${client.nit} - Huddle: ${client.huddleName} - Focus: ${client.focusName} - Socio: ${partner} - Asignados: ${assigned}`;
   assignmentEmailsInput.value = "";
 }
 
@@ -825,7 +846,7 @@ function renderAdminPanel() {
   adminPanel.classList.toggle("is-hidden", !isAdmin());
   if (!isAdmin()) return;
 
-  webhookUrlInput.value = getEffectiveEmailWebhookUrl();
+  smtpConfigInput.value = `Remitente previsto: ${requestSenderEmail}`;
   renderAssignmentSelector();
   adminClientsRows.innerHTML = "";
   adminAccessRows.innerHTML = "";
@@ -837,6 +858,8 @@ function renderAdminPanel() {
       <td>${escapeHtml(client.nit)}</td>
       <td>${escapeHtml(client.huddleName)}</td>
       <td>${escapeHtml(client.focusName)}</td>
+      <td>${escapeHtml(client.partnerName || "Sin socio")}</td>
+      <td>${escapeHtml(client.partnerEmail || "")}</td>
       <td>
         <input class="inline-input" type="text" value="${escapeHtml((client.assignedTo || []).join(", "))}" data-assignments-for="${escapeHtml(client.id)}">
       </td>
@@ -854,7 +877,7 @@ function renderAdminPanel() {
   if (accessRows.length === 0) {
     adminAccessRows.innerHTML = `
       <tr>
-        <td colspan="6" class="muted">Aun no hay accesos solicitados.</td>
+        <td colspan="8" class="muted">Aun no hay accesos solicitados.</td>
       </tr>
     `;
     return;
@@ -864,11 +887,13 @@ function renderAdminPanel() {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${escapeHtml(record.clientName)}</td>
-      <td>${escapeHtml(record.requestedUser)}</td>
+      <td>${escapeHtml(record.requesterEmail)}</td>
       <td>${escapeHtml(record.accesses)}</td>
       <td>${escapeHtml(record.expiresAt)}</td>
       <td>${escapeHtml(record.workToDevelop)}</td>
-      <td>${escapeHtml(record.requesterEmail)}</td>
+      <td>${escapeHtml(record.partnerName)}${record.partnerEmail ? `<br><span class="muted">${escapeHtml(record.partnerEmail)}</span>` : ""}</td>
+      <td><span class="badge ${escapeHtml(record.statusClass)}">${escapeHtml(record.status)}</span></td>
+      <td>${escapeHtml(record.mailError)}</td>
     `;
     adminAccessRows.append(row);
   });
@@ -876,9 +901,7 @@ function renderAdminPanel() {
 
 function buildAccessRequestPayload(formData) {
   const accesses = getSelectedAccesses(formData).join(", ");
-  const requestedUsers = isAdmin()
-    ? parseRequestedUsers(formData.get("usuariosAcceso"))
-    : uniqueValues([currentUser.email]);
+  const requestedUsers = uniqueValues([currentUser.email]);
 
   return {
     requestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -890,9 +913,12 @@ function buildAccessRequestPayload(formData) {
     focusName: selectedClient.focusName,
     serviceLine: selectedClient.serviceLine,
     manager: selectedClient.manager,
+    partnerName: selectedClient.partnerName,
+    partnerEmail: selectedClient.partnerEmail,
     requesterName: currentUser.name,
     requesterEmail: currentUser.email,
     senderEmail: requestSenderEmail,
+    approvalStatus: "pending_partner",
     requestedUsers,
     requestedUserEmails: requestedUsers.join(", "),
     accesses,
@@ -905,7 +931,7 @@ function buildAccessRequestPayload(formData) {
 }
 
 function buildEmailPreview(payload) {
-  const subject = `[Confidencialidad] Solicitud de acceso - ${payload.clientName} - ${payload.requesterEmail}`;
+  const subject = `[Confidencialidad] Aprobacion requerida - ${payload.clientName} - ${payload.requesterEmail}`;
   const body = [
     `Remitente sugerido: ${payload.senderEmail}`,
     `Cliente: ${payload.clientName}`,
@@ -913,7 +939,7 @@ function buildEmailPreview(payload) {
     `Nombre en Huddle: ${payload.huddleName}`,
     `Nombre en Focus: ${payload.focusName}`,
     `Solicitante: ${payload.requesterName} (${payload.requesterEmail})`,
-    `Usuarios que requieren acceso: ${payload.requestedUserEmails}`,
+    `Socio aprobador: ${payload.partnerName || "Sin socio asignado"} (${payload.partnerEmail || "sin correo"})`,
     `Accesos solicitados: ${payload.accesses}`,
     `Vigencia maxima: ${payload.expiresAt}`,
     `Trabajo a desarrollar: ${payload.workToDevelop}`,
@@ -921,29 +947,10 @@ function buildEmailPreview(payload) {
     "Confirmacion de uso autorizado: Si"
   ].join(" | ");
 
-  mailTo.textContent = accessTeam.join("; ");
+  mailTo.textContent = payload.partnerEmail || "Sin correo de socio configurado";
   mailSubject.textContent = subject;
   mailBody.textContent = body;
   mailPreview.classList.remove("is-hidden");
-}
-
-async function sendEmailWebhook(payload) {
-  const webhookUrl = getEffectiveEmailWebhookUrl();
-
-  if (!webhookUrl) {
-    return false;
-  }
-
-  await fetch(webhookUrl, {
-    method: "POST",
-    mode: "no-cors",
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  return true;
 }
 
 async function submitSurvey(event) {
@@ -952,21 +959,9 @@ async function submitSurvey(event) {
 
   const formData = new FormData(surveyForm);
   const accesses = getSelectedAccesses(formData);
-  const requestedUsers = parseRequestedUsers(formData.get("usuariosAcceso"));
-
-  if (requestedUsers.length === 0 || !requestedUsers.every(isBakerEmail)) {
-    showToast(`Agrega correos validos que terminen en ${allowedEmailDomain}.`);
-    return;
-  }
-
-  if (!isAdmin() && uniqueValues(requestedUsers).join(",") !== normalizeEmail(currentUser.email)) {
-    setDefaultRequestedUsers();
-    showToast("Solo puedes solicitar acceso para tu propio correo.");
-    return;
-  }
 
   if (accesses.length === 0 || submitSurveyButton.disabled) {
-    showToast("Selecciona los accesos, usuarios y confirma las declaraciones requeridas.");
+    showToast("Selecciona los accesos y confirma las declaraciones requeridas.");
     return;
   }
 
@@ -978,7 +973,9 @@ async function submitSurvey(event) {
     date: now.toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
     clientName: selectedClient.name,
     user: currentUser.email,
-    accesses: accesses.join(", ")
+    accesses: accesses.join(", "),
+    status: "Pendiente socio",
+    statusClass: "pending"
   });
 
   selectedClient.confidentialityStatus = "Vigente";
@@ -989,16 +986,9 @@ async function submitSurvey(event) {
   renderAdminPanel();
   updateSubmitState();
 
-  try {
-    const sentToWebhook = await sendEmailWebhook(payload);
-    showToast(sentToWebhook
-      ? "Solicitud registrada y enviada al flujo de correo."
-      : savedRemoteRecord
-        ? "Solicitud registrada en el panel admin. Falta configurar EMAIL_WEBHOOK_URL para enviar el correo."
-        : "Solicitud registrada en este navegador. La API del panel admin no respondio.");
-  } catch (error) {
-    showToast("Solicitud registrada, pero no se pudo llamar el flujo de correo.");
-  }
+  showToast(savedRemoteRecord
+    ? "Solicitud registrada. Queda pendiente de aprobacion del socio."
+    : "Solicitud registrada en este navegador. La API del panel admin no respondio.");
 }
 
 function getRedirectUri() {
@@ -1264,32 +1254,6 @@ async function logout() {
   adminPanel.classList.add("is-hidden");
 }
 
-function handleEmailConfigSubmit(event) {
-  event.preventDefault();
-  if (!requireAdminAction()) return;
-
-  const url = webhookUrlInput.value.trim();
-
-  if (url) {
-    localStorage.setItem(webhookStorageKey, url);
-    showToast("URL del flujo guardada en este navegador.");
-  } else {
-    localStorage.removeItem(webhookStorageKey);
-    showToast("URL del flujo eliminada.");
-  }
-
-  renderAdminPanel();
-}
-
-function clearWebhookConfig() {
-  if (!requireAdminAction()) return;
-
-  webhookUrlInput.value = "";
-  localStorage.removeItem(webhookStorageKey);
-  showToast("URL del flujo eliminada.");
-  renderAdminPanel();
-}
-
 async function handleClientAdminSubmit(event) {
   event.preventDefault();
   if (!requireAdminAction()) return;
@@ -1381,12 +1345,14 @@ function escapeCsvValue(value) {
 }
 
 function buildClientsCsv() {
-  const headers = ["nombre", "NIT", "nombre en huddle", "nombre en focus", "correos asignados"];
+  const headers = ["nombre", "NIT", "nombre en huddle", "nombre en focus", "socios asignados", "correo socios", "correos asignados"];
   const rows = clients.map((client) => [
     client.name,
     client.nit,
     client.huddleName,
     client.focusName,
+    client.partnerName || "",
+    client.partnerEmail || "",
     (client.assignedTo || []).join("; ")
   ]);
 
@@ -1415,8 +1381,6 @@ passwordEmail.value = temporaryLogin.email;
 passwordLoginForm.addEventListener("submit", loginWithPassword);
 loginButton.addEventListener("click", redirectToOffice365);
 logoutButton.addEventListener("click", logout);
-emailConfigForm.addEventListener("submit", handleEmailConfigSubmit);
-clearWebhookButton.addEventListener("click", clearWebhookConfig);
 clientAdminForm.addEventListener("submit", handleClientAdminSubmit);
 assignmentClientSelect.addEventListener("change", updateAssignmentFields);
 exportClientsCsvButton.addEventListener("click", downloadClientsCsv);

@@ -1,13 +1,20 @@
 const fs = require("fs");
 const http = require("http");
+const crypto = require("crypto");
 const os = require("os");
 const path = require("path");
+const tls = require("tls");
 const { URL } = require("url");
 
 const port = Number(process.env.PORT || 8766);
 const publicDir = path.join(__dirname, "prototipo-confidencialidad");
 const assignmentsPath = process.env.ASSIGNMENTS_FILE || path.join(os.tmpdir(), "confidencialidad-assignments.json");
 const accessRecordsPath = process.env.ACCESS_RECORDS_FILE || path.join(os.tmpdir(), "confidencialidad-access-records.json");
+const appBaseUrl = process.env.APP_BASE_URL || `http://localhost:${port}`;
+const accessTeamEmails = (process.env.ACCESS_TEAM_EMAILS || "accesos@bakertilly.co,seguridad.informacion@bakertilly.co")
+  .split(/[;,]/)
+  .map(normalizeEmail)
+  .filter(Boolean);
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -74,10 +81,24 @@ function writeAssignments(assignments) {
   fs.writeFileSync(assignmentsPath, JSON.stringify(normalizeAssignments(assignments), null, 2), "utf8");
 }
 
+function generateApprovalToken() {
+  return crypto.randomBytes(24).toString("hex");
+}
+
+function getApprovalStatus(record) {
+  return String(record.approvalStatus || record.status || "pending_partner");
+}
+
 function normalizeAccessRecord(record) {
   if (!record || typeof record !== "object" || Array.isArray(record)) {
     return null;
   }
+
+  const requesterEmail = normalizeEmail(record.requesterEmail);
+  const requestedUsers = Array.isArray(record.requestedUsers)
+    ? [...new Set(record.requestedUsers.map(normalizeEmail).filter(Boolean))]
+    : [];
+  const requestedUserEmails = String(record.requestedUserEmails || requestedUsers.join(", ") || requesterEmail);
 
   return {
     requestId: String(record.requestId || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
@@ -90,12 +111,19 @@ function normalizeAccessRecord(record) {
     serviceLine: String(record.serviceLine || ""),
     manager: String(record.manager || ""),
     requesterName: String(record.requesterName || ""),
-    requesterEmail: normalizeEmail(record.requesterEmail),
+    requesterEmail,
     senderEmail: normalizeEmail(record.senderEmail),
-    requestedUsers: Array.isArray(record.requestedUsers)
-      ? [...new Set(record.requestedUsers.map(normalizeEmail).filter(Boolean))]
-      : [],
-    requestedUserEmails: String(record.requestedUserEmails || ""),
+    partnerName: String(record.partnerName || record.socio || ""),
+    partnerEmail: normalizeEmail(record.partnerEmail || record.socioEmail),
+    approvalStatus: getApprovalStatus(record),
+    approvalToken: String(record.approvalToken || generateApprovalToken()),
+    approvalRequestedAt: String(record.approvalRequestedAt || ""),
+    approvedAt: String(record.approvedAt || ""),
+    approvedBy: normalizeEmail(record.approvedBy),
+    accessEmailSentAt: String(record.accessEmailSentAt || ""),
+    mailError: String(record.mailError || ""),
+    requestedUsers: requestedUsers.length > 0 ? requestedUsers : [requesterEmail].filter(Boolean),
+    requestedUserEmails,
     accesses: String(record.accesses || ""),
     expiresAt: String(record.expiresAt || ""),
     workToDevelop: String(record.workToDevelop || ""),
@@ -147,6 +175,231 @@ function appendAccessRecord(record) {
   return { record: normalizedRecord, records: mergedRecords };
 }
 
+function updateAccessRecord(requestId, updater) {
+  const records = readAccessRecords();
+  const index = records.findIndex((record) => record.requestId === requestId);
+
+  if (index < 0) {
+    return null;
+  }
+
+  const updatedRecord = normalizeAccessRecord(updater(records[index]));
+  records[index] = updatedRecord;
+  writeAccessRecords(records);
+  return { record: updatedRecord, records };
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function smtpConfigured() {
+  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+}
+
+function smtpResponseReader(socket) {
+  let buffer = "";
+
+  return () => new Promise((resolve, reject) => {
+    const onData = (chunk) => {
+      buffer += chunk;
+      const lines = buffer.split(/\r?\n/).filter(Boolean);
+      const lastLine = lines[lines.length - 1] || "";
+
+      if (/^\d{3} /.test(lastLine)) {
+        socket.off("data", onData);
+        socket.off("error", onError);
+        const response = buffer;
+        buffer = "";
+        resolve(response);
+      }
+    };
+
+    const onError = (error) => {
+      socket.off("data", onData);
+      socket.off("error", onError);
+      reject(error);
+    };
+
+    socket.on("data", onData);
+    socket.on("error", onError);
+  });
+}
+
+function assertSmtpOk(response, expectedCodes) {
+  const code = Number(String(response).slice(0, 3));
+  if (!expectedCodes.includes(code)) {
+    throw new Error(`SMTP error ${String(response).trim()}`);
+  }
+}
+
+function dotStuff(value) {
+  return String(value).replace(/^\./gm, "..");
+}
+
+function formatAddress(email, name = "") {
+  const cleanEmail = normalizeEmail(email);
+  return name ? `"${String(name).replaceAll('"', "'")}" <${cleanEmail}>` : cleanEmail;
+}
+
+async function sendSmtpMail({ to, subject, text, html }) {
+  const recipients = (Array.isArray(to) ? to : [to]).map(normalizeEmail).filter(Boolean);
+
+  if (recipients.length === 0) {
+    return { ok: false, skipped: true, error: "No recipients" };
+  }
+
+  if (!smtpConfigured()) {
+    return { ok: false, skipped: true, error: "SMTP not configured" };
+  }
+
+  const host = process.env.SMTP_HOST;
+  const portNumber = Number(process.env.SMTP_PORT || 465);
+  const user = process.env.SMTP_USER;
+  const password = process.env.SMTP_PASS;
+  const from = normalizeEmail(process.env.SMTP_FROM || user);
+  const timeoutMs = Number(process.env.SMTP_TIMEOUT_MS || 12000);
+
+  return await new Promise((resolve, reject) => {
+    const socket = tls.connect({
+      host,
+      port: portNumber,
+      servername: host,
+      timeout: timeoutMs
+    });
+    socket.setEncoding("utf8");
+
+    const readResponse = smtpResponseReader(socket);
+
+    const sendCommand = async (command, expectedCodes = [250]) => {
+      socket.write(`${command}\r\n`);
+      assertSmtpOk(await readResponse(), expectedCodes);
+    };
+
+    socket.on("timeout", () => {
+      socket.destroy(new Error("SMTP timeout"));
+    });
+
+    socket.once("error", reject);
+    socket.once("secureConnect", async () => {
+      try {
+        assertSmtpOk(await readResponse(), [220]);
+        await sendCommand("EHLO indep.onrender.com", [250]);
+        await sendCommand(`AUTH PLAIN ${Buffer.from(`\0${user}\0${password}`).toString("base64")}`, [235]);
+        await sendCommand(`MAIL FROM:<${from}>`, [250]);
+
+        for (const recipient of recipients) {
+          await sendCommand(`RCPT TO:<${recipient}>`, [250, 251]);
+        }
+
+        await sendCommand("DATA", [354]);
+
+        const htmlPart = html || `<pre>${escapeHtml(text || "")}</pre>`;
+        const textPart = text || String(htmlPart).replace(/<[^>]+>/g, " ");
+        const message = [
+          `From: ${formatAddress(from, "Confidencialidad")}`,
+          `To: ${recipients.join(", ")}`,
+          `Subject: ${subject}`,
+          "MIME-Version: 1.0",
+          "Content-Type: multipart/alternative; boundary=confidencialidad-boundary",
+          "",
+          "--confidencialidad-boundary",
+          "Content-Type: text/plain; charset=utf-8",
+          "",
+          textPart,
+          "--confidencialidad-boundary",
+          "Content-Type: text/html; charset=utf-8",
+          "",
+          htmlPart,
+          "--confidencialidad-boundary--",
+          ""
+        ].join("\r\n");
+
+        socket.write(`${dotStuff(message)}\r\n.\r\n`);
+        assertSmtpOk(await readResponse(), [250]);
+        await sendCommand("QUIT", [221]);
+        socket.end();
+        resolve({ ok: true });
+      } catch (error) {
+        socket.destroy();
+        reject(error);
+      }
+    });
+  }).catch((error) => ({ ok: false, error: error.message }));
+}
+
+function approvalLink(record) {
+  const url = new URL("/api/access-records/approve", appBaseUrl);
+  url.searchParams.set("requestId", record.requestId);
+  url.searchParams.set("token", record.approvalToken);
+  return url.toString();
+}
+
+function requestSummaryHtml(record) {
+  return `
+    <table>
+      <tr><td><strong>Cliente</strong></td><td>${escapeHtml(record.clientName)}</td></tr>
+      <tr><td><strong>NIT</strong></td><td>${escapeHtml(record.nit)}</td></tr>
+      <tr><td><strong>Nombre en Huddle</strong></td><td>${escapeHtml(record.huddleName)}</td></tr>
+      <tr><td><strong>Nombre en Focus</strong></td><td>${escapeHtml(record.focusName)}</td></tr>
+      <tr><td><strong>Solicitante</strong></td><td>${escapeHtml(record.requesterName)} (${escapeHtml(record.requesterEmail)})</td></tr>
+      <tr><td><strong>Accesos solicitados</strong></td><td>${escapeHtml(record.accesses)}</td></tr>
+      <tr><td><strong>Vigencia maxima</strong></td><td>${escapeHtml(record.expiresAt)}</td></tr>
+      <tr><td><strong>Trabajo a desarrollar</strong></td><td>${escapeHtml(record.workToDevelop)}</td></tr>
+      <tr><td><strong>Socio</strong></td><td>${escapeHtml(record.partnerName)} (${escapeHtml(record.partnerEmail)})</td></tr>
+    </table>
+  `;
+}
+
+async function sendPartnerApprovalRequest(record) {
+  if (!record.partnerEmail) {
+    return updateAccessRecord(record.requestId, (current) => ({
+      ...current,
+      approvalStatus: "pending_partner",
+      mailError: "Cliente sin correo de socio"
+    }));
+  }
+
+  const link = approvalLink(record);
+  const result = await sendSmtpMail({
+    to: record.partnerEmail,
+    subject: `[Confidencialidad] Aprobacion requerida - ${record.clientName}`,
+    text: `Se registro una solicitud de acceso para ${record.clientName}. Aprueba aqui: ${link}`,
+    html: `
+      <p>Se registro una solicitud de acceso que requiere aprobacion del socio.</p>
+      ${requestSummaryHtml(record)}
+      <p><a href="${escapeHtml(link)}">Aprobar solicitud</a></p>
+    `
+  });
+
+  return updateAccessRecord(record.requestId, (current) => ({
+    ...current,
+    approvalStatus: "pending_partner",
+    approvalRequestedAt: result.ok ? new Date().toISOString() : current.approvalRequestedAt,
+    mailError: result.ok ? "" : result.error
+  }));
+}
+
+async function sendAccessRequestToTeam(record) {
+  const recipients = record.recipients?.length ? record.recipients : accessTeamEmails;
+  return await sendSmtpMail({
+    to: recipients,
+    subject: `[Confidencialidad] Solicitud aprobada - ${record.clientName} - ${record.requesterEmail}`,
+    text: `Solicitud aprobada para ${record.clientName} por ${record.partnerEmail || record.approvedBy}.`,
+    html: `
+      <p>El socio aprobo la siguiente solicitud de acceso.</p>
+      ${requestSummaryHtml(record)}
+      <p><strong>Aprobado por:</strong> ${escapeHtml(record.approvedBy || record.partnerEmail)}</p>
+      <p><strong>Fecha de aprobacion:</strong> ${escapeHtml(record.approvedAt)}</p>
+    `
+  });
+}
+
 async function handleAssignments(request, response) {
   if (request.method === "GET") {
     sendJson(response, 200, { assignments: readAssignments() });
@@ -184,7 +437,8 @@ async function handleAccessRecords(request, response) {
           throw new Error("Invalid access record");
         }
 
-        sendJson(response, 200, { ok: true, ...result });
+        const approvalResult = await sendPartnerApprovalRequest(result.record);
+        sendJson(response, 200, { ok: true, ...(approvalResult || result) });
         return;
       }
 
@@ -202,6 +456,83 @@ async function handleAccessRecords(request, response) {
   }
 
   sendJson(response, 405, { ok: false, error: "Method not allowed" });
+}
+
+function sendHtml(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store"
+  });
+  response.end(`<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aprobacion de solicitud</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; color: #222; background: #f6f7f8; }
+      main { max-width: 720px; margin: 8vh auto; background: #fff; padding: 32px; border-radius: 8px; border: 1px solid #dfe3e6; }
+      h1 { margin-top: 0; }
+      p { line-height: 1.55; }
+      .muted { color: #667078; }
+    </style>
+  </head>
+  <body><main>${body}</main></body>
+</html>`);
+}
+
+async function handleAccessApproval(request, response, url) {
+  if (request.method !== "GET") {
+    sendJson(response, 405, { ok: false, error: "Method not allowed" });
+    return;
+  }
+
+  const requestId = url.searchParams.get("requestId") || "";
+  const token = url.searchParams.get("token") || "";
+  const record = readAccessRecords().find((item) => item.requestId === requestId);
+
+  if (!record || !token || record.approvalToken !== token) {
+    sendHtml(response, 403, `
+      <h1>No se pudo aprobar la solicitud</h1>
+      <p>El enlace no es valido o la solicitud ya no existe.</p>
+    `);
+    return;
+  }
+
+  if (record.accessEmailSentAt) {
+    sendHtml(response, 200, `
+      <h1>Solicitud ya aprobada</h1>
+      <p>La solicitud para <strong>${escapeHtml(record.clientName)}</strong> ya fue aprobada y enviada al equipo de accesos.</p>
+      <p class="muted">No necesitas hacer nada mas.</p>
+    `);
+    return;
+  }
+
+  const approvedAt = new Date().toISOString();
+  const approved = updateAccessRecord(record.requestId, (current) => ({
+    ...current,
+    approvalStatus: "approved",
+    approvedAt,
+    approvedBy: current.partnerEmail
+  }));
+
+  const emailResult = approved ? await sendAccessRequestToTeam(approved.record) : { ok: false, error: "Record not found" };
+  const finalStatus = emailResult.ok ? "sent_to_access_team" : "approved_pending_email";
+  const finalRecord = updateAccessRecord(record.requestId, (current) => ({
+    ...current,
+    approvalStatus: finalStatus,
+    accessEmailSentAt: emailResult.ok ? new Date().toISOString() : current.accessEmailSentAt,
+    mailError: emailResult.ok ? "" : emailResult.error
+  }))?.record;
+
+  sendHtml(response, 200, `
+    <h1>Solicitud aprobada</h1>
+    <p>Se aprobo la solicitud de acceso para <strong>${escapeHtml(finalRecord?.clientName || record.clientName)}</strong>.</p>
+    <p>${emailResult.ok
+      ? "El correo final fue enviado al equipo de accesos."
+      : "La aprobacion quedo registrada, pero el correo final queda pendiente hasta configurar Gmail SMTP."}</p>
+    ${emailResult.ok ? "" : `<p class="muted">Detalle tecnico: ${escapeHtml(emailResult.error)}</p>`}
+  `);
 }
 
 function safeStaticPath(pathname) {
@@ -242,6 +573,11 @@ const server = http.createServer(async (request, response) => {
 
   if (url.pathname === "/api/access-records") {
     await handleAccessRecords(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/access-records/approve") {
+    await handleAccessApproval(request, response, url);
     return;
   }
 

@@ -28,7 +28,6 @@ const config = {
   temporaryAdminName: process.env.TEMP_ADMIN_NAME || "Admin",
   temporaryAdminEmail: process.env.TEMP_ADMIN_EMAIL || "admin@bakertilly.co",
   temporaryAdminPasswordHash: process.env.TEMP_ADMIN_PASSWORD_HASH || "8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec",
-  emailWebhookUrl: process.env.EMAIL_WEBHOOK_URL || "",
   requestSenderEmail: process.env.REQUEST_SENDER_EMAIL || "accesos@bakertilly.co",
   clientsCsvUrl: process.env.CLIENTS_CSV_URL || "clientes.csv",
   assignmentsApiUrl: process.env.ASSIGNMENTS_API_URL || "/api/assignments",

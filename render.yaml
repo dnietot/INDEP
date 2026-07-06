@@ -11,10 +11,22 @@ services:
         value: 9d3e6808-f124-4324-875c-7e6da0b0a3bf
       - key: ALLOWED_EMAIL_DOMAIN
         value: "@bakertilly.co"
-      - key: EMAIL_WEBHOOK_URL
-        sync: false
       - key: REQUEST_SENDER_EMAIL
         value: accesos@bakertilly.co
+      - key: APP_BASE_URL
+        value: https://indep.onrender.com
+      - key: ACCESS_TEAM_EMAILS
+        value: accesos@bakertilly.co,seguridad.informacion@bakertilly.co
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
       - key: CLIENTS_CSV_URL
         value: clientes.csv
       - key: ASSIGNMENTS_API_URL

@@ -5,9 +5,10 @@ Este prototipo muestra el flujo esperado:
 1. Entrada con Office 365.
 2. Listado de clientes asignados al usuario.
 3. Boton Confidencialidad por cliente.
-4. Formulario de encuesta con uno o varios correos Baker que requieren acceso.
-5. Confirmacion del correo que se enviaria a encargados de accesos.
-6. Panel admin para ver clientes, solicitudes y configurar la URL del flujo de correo.
+4. Formulario de encuesta para el correo autenticado.
+5. Aprobacion del socio asignado al cliente.
+6. Envio automatico del correo final al equipo de accesos despues de la aprobacion.
+7. Panel admin para ver clientes, socios, solicitudes y estados.
 
 Para abrirlo, usa el archivo:
 
@@ -41,8 +42,14 @@ TEMP_ADMIN_LOGIN=admin
 TEMP_ADMIN_NAME=Admin
 TEMP_ADMIN_EMAIL=admin@bakertilly.co
 TEMP_ADMIN_PASSWORD_HASH=8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec
-EMAIL_WEBHOOK_URL=<URL del flujo de Power Automate>
 REQUEST_SENDER_EMAIL=accesos@bakertilly.co
+APP_BASE_URL=https://indep.onrender.com
+ACCESS_TEAM_EMAILS=accesos@bakertilly.co,seguridad.informacion@bakertilly.co
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=<correo gmail remitente>
+SMTP_PASS=<app password de gmail>
+SMTP_FROM=<correo gmail remitente>
 CLIENTS_CSV_URL=clientes.csv
 ASSIGNMENTS_API_URL=/api/assignments
 ACCESS_RECORDS_API_URL=/api/access-records
@@ -65,13 +72,13 @@ Usuario admin: admin
 Contrasena admin: Admin2026*
 ```
 
-El perfil `admin` puede ver todos los clientes, revisar las solicitudes registradas por correo Baker y plataforma, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
+El perfil `admin` puede ver todos los clientes, revisar las solicitudes registradas por correo Baker y plataforma, agregar/quitar clientes, actualizar correos asignados y ver el estado de aprobacion del socio.
 
-Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate. El cuerpo enviado incluye `requestedUsers` como arreglo, `requestedUserEmails` como texto separado por comas y `senderEmail` con el valor de `REQUEST_SENDER_EMAIL`.
+La solicitud queda primero como `Pendiente socio`. Si Gmail SMTP esta configurado en Render, el sistema envia al socio un correo con enlace de aprobacion. Cuando el socio aprueba, el backend envia el correo final al equipo de accesos. Si Gmail no esta configurado, la solicitud queda registrada y el panel admin muestra el detalle tecnico como correo pendiente.
 
-Para que todas las solicitudes salgan desde un correo general, TI debe crear o habilitar un buzon compartido, por ejemplo `accesos@bakertilly.co`, dar permiso `Enviar como` a la cuenta que ejecuta el flujo de Power Automate y usar la accion Office 365 Outlook `Send an email from a shared mailbox (V2)`.
+Para la prueba con Gmail, crear un correo remitente y configurar en Render `SMTP_USER`, `SMTP_PASS` y `SMTP_FROM`. En Gmail normalmente se usa una app password, no la contrasena normal de la cuenta.
 
-Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus` y la columna opcional `correos asignados`. El panel admin agrega correos nuevos sin borrar los ya asignados y los guarda en `/api/assignments`. Las solicitudes se guardan en `/api/access-records`, para que aparezcan en el panel admin aunque las haya enviado otro usuario. Para produccion se recomienda conectar SharePoint Lists, Dataverse o una base de datos persistente.
+Nota: el catalogo base de clientes se carga desde `clientes.csv` con las columnas `nombre`, `NIT`, `nombre en huddle`, `nombre en focus`, `socios asignados`, `correo socios` y `correos asignados`. El panel admin agrega correos nuevos sin borrar los ya asignados y los guarda en `/api/assignments`. Las solicitudes se guardan en `/api/access-records`, para que aparezcan en el panel admin aunque las haya enviado otro usuario. Para produccion se recomienda conectar SharePoint Lists, Dataverse o una base de datos persistente.
 
 Con `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=false`, un usuario autenticado por Office 365 solo ve los clientes donde su correo este asignado por el admin. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 
