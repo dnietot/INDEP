@@ -11,7 +11,7 @@ const publicDir = path.join(__dirname, "prototipo-confidencialidad");
 const assignmentsPath = process.env.ASSIGNMENTS_FILE || path.join(os.tmpdir(), "confidencialidad-assignments.json");
 const accessRecordsPath = process.env.ACCESS_RECORDS_FILE || path.join(os.tmpdir(), "confidencialidad-access-records.json");
 const appBaseUrl = process.env.APP_BASE_URL || `http://localhost:${port}`;
-const accessTeamEmails = (process.env.ACCESS_TEAM_EMAILS || "accesos@bakertilly.co,seguridad.informacion@bakertilly.co")
+const accessTeamEmails = (process.env.ACCESS_TEAM_EMAILS || "dnieto@bakertilly.co")
   .split(/[;,]/)
   .map(normalizeEmail)
   .filter(Boolean);

@@ -16,7 +16,7 @@ services:
       - key: APP_BASE_URL
         value: https://indep.onrender.com
       - key: ACCESS_TEAM_EMAILS
-        value: accesos@bakertilly.co,seguridad.informacion@bakertilly.co
+        value: dnieto@bakertilly.co
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

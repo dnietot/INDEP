@@ -139,7 +139,7 @@ Para la prueba rapida con Gmail:
 
 ```text
 APP_BASE_URL=https://indep.onrender.com
-ACCESS_TEAM_EMAILS=accesos@bakertilly.co,seguridad.informacion@bakertilly.co
+ACCESS_TEAM_EMAILS=dnieto@bakertilly.co
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
 SMTP_USER=<correo gmail>
