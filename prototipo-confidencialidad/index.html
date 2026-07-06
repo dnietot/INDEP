@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Confidencialidad | Clientes asignados</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=20260706-assignments">
   </head>
   <body>
     <main class="auth-screen" id="authScreen">
@@ -223,7 +223,7 @@
             </div>
             <label>
               Correos asignados
-              <input name="assignedTo" type="text" placeholder="correo1@bakertilly.co, correo2@bakertilly.co" required>
+              <input name="assignedTo" type="text" placeholder="correo1@bakertilly.co, correo2@bakertilly.co, *@bakertilly.co" required>
             </label>
             <div class="form-actions">
               <button class="primary" type="submit">Agregar cliente</button>
@@ -304,8 +304,8 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="env.js?v=20260703-office365"></script>
+    <script src="env.js?v=20260706-assignments"></script>
     <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
-    <script src="app.js?v=20260703-office365"></script>
+    <script src="app.js?v=20260706-assignments"></script>
   </body>
 </html>

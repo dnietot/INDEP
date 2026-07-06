@@ -621,6 +621,16 @@ dd {
   font-size: 0.86rem;
 }
 
+.inline-input {
+  min-width: 280px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .table-wrap {
   overflow-x: auto;
   max-width: 100%;

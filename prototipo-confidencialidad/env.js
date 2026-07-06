@@ -11,5 +11,6 @@ window.CONFIDENCIALIDAD_CONFIG = {
   "temporaryAdminName": "Admin",
   "temporaryAdminEmail": "admin@bakertilly.co",
   "temporaryAdminPasswordHash": "8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec",
-  "emailWebhookUrl": ""
+  "emailWebhookUrl": "",
+  "showAllClientsWhenUnassigned": true
 };

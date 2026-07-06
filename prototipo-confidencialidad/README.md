@@ -42,6 +42,7 @@ TEMP_ADMIN_NAME=Admin
 TEMP_ADMIN_EMAIL=admin@bakertilly.co
 TEMP_ADMIN_PASSWORD_HASH=8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec
 EMAIL_WEBHOOK_URL=<URL del flujo de Power Automate>
+SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=true
 ```
 
 `ENTRA_CLIENT_ID` debe ser el GUID real de Microsoft Entra ID. Para esta app quedo configurado como `9d3e6808-f124-4324-875c-7e6da0b0a3bf`.
@@ -60,11 +61,13 @@ Usuario admin: admin
 Contrasena admin: Admin2026*
 ```
 
-El perfil `admin` puede ver todos los clientes, revisar las solicitudes registradas, agregar/quitar clientes y guardar desde la pagina la URL del flujo de Power Automate.
+El perfil `admin` puede ver todos los clientes, revisar las solicitudes registradas, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
 
 Si `EMAIL_WEBHOOK_URL` queda vacio, la app solo prepara la vista previa del correo. Si se configura en Render o desde el panel admin, la app enviara la solicitud al flujo de Power Automate.
 
-Nota: el panel admin guarda clientes, solicitudes y URL del flujo en `localStorage`. Eso sirve para validar el comportamiento desde un navegador, pero no es una base compartida entre usuarios. Para produccion se necesita backend, SharePoint Lists, Dataverse o una base de datos.
+Nota: el panel admin guarda clientes, solicitudes, asignaciones y URL del flujo en `localStorage`. Eso sirve para validar el comportamiento desde un navegador, pero no es una base compartida entre usuarios. Para produccion se necesita backend, SharePoint Lists, Dataverse o una base de datos.
+
+Para la demo, `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=true` evita que un usuario corporativo autenticado por Office 365 vea la lista vacia si todavia no tiene asignaciones exactas cargadas. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 
 ## Prueba con Office 365 real
 

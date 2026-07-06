@@ -43,6 +43,7 @@ Configurar estas variables de entorno:
 | TEMP_ADMIN_EMAIL | `admin@bakertilly.co` |
 | TEMP_ADMIN_PASSWORD_HASH | Hash SHA-256 de la contrasena temporal del admin |
 | EMAIL_WEBHOOK_URL | URL del flujo de Power Automate que enviara el correo |
+| SHOW_ALL_CLIENTS_WHEN_UNASSIGNED | `true` para demo; `false` cuando exista base real de asignaciones |
 
 ## Solicitud a TI
 
@@ -107,9 +108,11 @@ Usuario: admin
 Contrasena: Admin2026*
 ```
 
-El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o Focus, agregar/quitar clientes y guardar desde la pagina la URL del flujo de Power Automate.
+El admin puede ver todos los clientes, revisar quien solicito acceso a Huddle o Focus, agregar/quitar clientes, actualizar correos asignados y guardar desde la pagina la URL del flujo de Power Automate.
 
 Importante: como Render esta publicando un sitio estatico, esa administracion queda en `localStorage` del navegador. Es util para validar pantallas y flujo, pero no sincroniza datos entre usuarios. Para que el admin gestione informacion real compartida se necesita conectar la app a SharePoint Lists, Dataverse, una API/backend o una base de datos.
+
+Mientras no exista esa base compartida, `SHOW_ALL_CLIENTS_WHEN_UNASSIGNED=true` permite que un usuario autenticado por Office 365 vea clientes aunque no tenga una asignacion exacta. Las asignaciones aceptan correos completos, usuario antes del arroba, dominios como `bakertilly.co` o comodines como `*@bakertilly.co`.
 
 ## Envio automatico de correo
 

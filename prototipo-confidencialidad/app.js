@@ -25,8 +25,9 @@ const office365Auth = {
 };
 
 const allowedEmailDomain = window.CONFIDENCIALIDAD_CONFIG?.allowedEmailDomain || "@bakertilly.co";
-const graphMeEndpoint = "https://graph.microsoft.com/v1.0/me";
+const graphMeEndpoint = "https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName,otherMails";
 const emailWebhookUrl = window.CONFIDENCIALIDAD_CONFIG?.emailWebhookUrl || "";
+const showAllClientsWhenUnassigned = window.CONFIDENCIALIDAD_CONFIG?.showAllClientsWhenUnassigned !== false;
 const temporaryLogin = {
   enabled: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginEnabled !== false,
   name: window.CONFIDENCIALIDAD_CONFIG?.temporaryLoginName || "Diego Nieto",
@@ -205,12 +206,61 @@ function getEffectiveEmailWebhookUrl() {
   return localStorage.getItem(webhookStorageKey) || emailWebhookUrl;
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function parseAssignedTo(value) {
+  return String(value || "")
+    .split(/[,\n;]/)
+    .map(normalizeEmail)
+    .filter(Boolean);
+}
+
+function uniqueValues(values) {
+  return [...new Set(values.map(normalizeEmail).filter(Boolean))];
+}
+
+function currentUserEmails() {
+  return uniqueValues([currentUser.email, ...(currentUser.aliases || [])]);
+}
+
+function matchesAssignedToken(token, userEmail) {
+  const assigned = normalizeEmail(token);
+  const email = normalizeEmail(userEmail);
+  const localPart = email.split("@")[0];
+
+  if (!assigned || !email) return false;
+  if (assigned === email || assigned === localPart) return true;
+  if (assigned.startsWith("*@") && email.endsWith(assigned.slice(1))) return true;
+  if (!assigned.includes("@") && email.endsWith(`@${assigned}`)) return true;
+
+  return false;
+}
+
+function isClientAssignedToCurrentUser(client) {
+  const userEmails = currentUserEmails();
+  return (client.assignedTo || []).some((assigned) => {
+    return userEmails.some((email) => matchesAssignedToken(assigned, email));
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function assignedClients() {
   if (isAdmin()) {
     return clients;
   }
 
-  return clients.filter((client) => client.assignedTo.includes(currentUser.email));
+  const assigned = clients.filter(isClientAssignedToCurrentUser);
+  return assigned.length > 0 || !showAllClientsWhenUnassigned ? assigned : clients;
 }
 
 function renderMetrics() {
@@ -340,11 +390,18 @@ function renderAdminPanel() {
   clients.forEach((client) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${client.name}</td>
-      <td>${client.nit}</td>
-      <td>${client.serviceLine}</td>
-      <td>${client.assignedTo.join(", ")}</td>
-      <td><button class="secondary small-button" type="button" data-remove-client="${client.id}">Quitar</button></td>
+      <td>${escapeHtml(client.name)}</td>
+      <td>${escapeHtml(client.nit)}</td>
+      <td>${escapeHtml(client.serviceLine)}</td>
+      <td>
+        <input class="inline-input" type="text" value="${escapeHtml((client.assignedTo || []).join(", "))}" data-assignments-for="${escapeHtml(client.id)}">
+      </td>
+      <td>
+        <div class="row-actions">
+          <button class="secondary small-button" type="button" data-save-assignments="${escapeHtml(client.id)}">Guardar</button>
+          <button class="secondary small-button" type="button" data-remove-client="${escapeHtml(client.id)}">Quitar</button>
+        </div>
+      </td>
     `;
     adminClientsRows.append(row);
   });
@@ -361,11 +418,11 @@ function renderAdminPanel() {
   accessRecords.forEach((record) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${record.clientName}</td>
-      <td>${record.requesterEmail}</td>
-      <td>${record.accesses}</td>
-      <td>${record.expiresAt}</td>
-      <td>${record.workToDevelop}</td>
+      <td>${escapeHtml(record.clientName)}</td>
+      <td>${escapeHtml(record.requesterEmail)}</td>
+      <td>${escapeHtml(record.accesses)}</td>
+      <td>${escapeHtml(record.expiresAt)}</td>
+      <td>${escapeHtml(record.workToDevelop)}</td>
     `;
     adminAccessRows.append(row);
   });
@@ -502,7 +559,8 @@ function applyTemporaryUser(user = getTemporaryUsers()[0]) {
   currentUser = {
     name: user.name,
     email: user.email,
-    role: user.role
+    role: user.role,
+    aliases: uniqueValues([user.email, user.login])
   };
 }
 
@@ -627,7 +685,13 @@ function applyAuthenticatedUser(profile, account) {
   currentUser = {
     name: profile.displayName || account.name || email,
     email,
-    role: "user"
+    role: "user",
+    aliases: uniqueValues([
+      profile.mail,
+      profile.userPrincipalName,
+      account.username,
+      ...(profile.otherMails || [])
+    ])
   };
 
   return true;
@@ -752,10 +816,7 @@ function clearWebhookConfig() {
 function handleClientAdminSubmit(event) {
   event.preventDefault();
   const formData = new FormData(clientAdminForm);
-  const assignedTo = String(formData.get("assignedTo") || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
+  const assignedTo = parseAssignedTo(formData.get("assignedTo"));
 
   const client = {
     id: `CLI-${Date.now()}`,
@@ -800,6 +861,24 @@ function removeClient(clientId) {
   showToast("Cliente eliminado.");
 }
 
+function saveClientAssignments(clientId, value) {
+  const client = clients.find((item) => item.id === clientId);
+  if (!client) return;
+
+  const assignedTo = parseAssignedTo(value);
+  if (assignedTo.length === 0) {
+    showToast("Agrega al menos un correo asignado.");
+    return;
+  }
+
+  client.assignedTo = assignedTo;
+  saveClients();
+  renderClients();
+  renderAdminPanel();
+  renderMetrics();
+  showToast("Asignaciones guardadas.");
+}
+
 passwordEmail.value = temporaryLogin.email;
 passwordLoginForm.addEventListener("submit", loginWithPassword);
 loginButton.addEventListener("click", redirectToOffice365);
@@ -826,9 +905,17 @@ clientList.addEventListener("click", (event) => {
 });
 
 adminClientsRows.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-remove-client]");
-  if (!button) return;
-  removeClient(button.dataset.removeClient);
+  const saveButton = event.target.closest("[data-save-assignments]");
+  if (saveButton) {
+    const row = saveButton.closest("tr");
+    const input = row.querySelector("[data-assignments-for]");
+    saveClientAssignments(saveButton.dataset.saveAssignments, input.value);
+    return;
+  }
+
+  const removeButton = event.target.closest("[data-remove-client]");
+  if (!removeButton) return;
+  removeClient(removeButton.dataset.removeClient);
 });
 
 finishOffice365Redirect();

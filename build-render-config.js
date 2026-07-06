@@ -28,7 +28,8 @@ const config = {
   temporaryAdminName: process.env.TEMP_ADMIN_NAME || "Admin",
   temporaryAdminEmail: process.env.TEMP_ADMIN_EMAIL || "admin@bakertilly.co",
   temporaryAdminPasswordHash: process.env.TEMP_ADMIN_PASSWORD_HASH || "8d90ed647b948fa80c3c9bbf5316c78f151723f52fb9d6101f818af8afff69ec",
-  emailWebhookUrl: process.env.EMAIL_WEBHOOK_URL || ""
+  emailWebhookUrl: process.env.EMAIL_WEBHOOK_URL || "",
+  showAllClientsWhenUnassigned: process.env.SHOW_ALL_CLIENTS_WHEN_UNASSIGNED !== "false"
 };
 
 const output = `window.CONFIDENCIALIDAD_CONFIG = ${JSON.stringify(config, null, 2)};\n`;

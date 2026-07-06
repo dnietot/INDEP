@@ -13,6 +13,8 @@ services:
         value: "@bakertilly.co"
       - key: EMAIL_WEBHOOK_URL
         sync: false
+      - key: SHOW_ALL_CLIENTS_WHEN_UNASSIGNED
+        value: "true"
       - key: TEMP_ADMIN_ENABLED
         value: "true"
       - key: TEMP_ADMIN_LOGIN
